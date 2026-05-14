@@ -237,8 +237,13 @@ let currentEditingKBId = null; // Controle para saber se estamos editando na KB
             border-left: 4px solid var(--color-warning);
         }
         .row-pending-check td {
-            border-top: 1px solid var(--color-warning) !important;
-            border-bottom: 1px solid var(--color-warning) !important;
+            border-top: 1px solid rgba(245, 158, 11, 0.5) !important;
+            border-bottom: 1px solid rgba(245, 158, 11, 0.5) !important;
+        }
+        /* Melhora o contraste do texto no modo escuro para a linha destacada */
+        body.dark-mode .row-pending-check td,
+        body.dark-mode .row-pending-check td strong {
+            color: var(--color-text-primary) !important;
         }
 
         .fab { position: fixed; right: 3rem; bottom: 3rem; width: 56px; height: 56px; background-color: var(--color-brand-primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 20px rgba(0,0,0,0.15); cursor: pointer; border: none; z-index: 100; transition: transform 0.2s; } .fab:hover { transform: scale(1.05); }
@@ -8709,7 +8714,10 @@ async function loadRequestManagementPage() {
         return;
     }
 
-    if (!data || data.length === 0) {
+    // FILTRO ADICIONADO: Remove requisições de manutenção desta visualização
+    const filteredData = (data || []).filter(req => req.type !== 'maintenance');
+
+    if (filteredData.length === 0) {
         tableBody.innerHTML = `<tr><td colspan="5" class="empty-state">Nenhuma requisição para gerenciar no momento.</td></tr>`;
         return;
     }
@@ -8728,18 +8736,22 @@ async function loadRequestManagementPage() {
 
     const statusTranslations = {
         'pending': 'Pendente (RH)',
-        'pending_manager_check': 'Com Gerente', // TEXTO ATUALIZADO
+        'pending_manager_check': 'Com Gerente',
         'pending_final_approval': 'Aprovação Final Pendente',
         'approved': 'Aprovada', 'rejected': 'Recusada',
         'planned': 'Planejada', 'executed': 'Executada'
     };
 
-    tableBody.innerHTML = data.map(req => {
-        let statusLabel = statusTranslations[req.status] || req.status;
-        let statusClass = req.status.includes('approved') || req.status === 'executed' || req.status === 'planned' ? 'status-approved' : (req.status.includes('rejected') ? 'status-rejected' : 'status-pending');
+    tableBody.innerHTML = filteredData.map(req => {
+        const statusLabel = statusTranslations[req.status] || req.status;
+        let statusClass = 'status-pending'; // Cor padrão amarela
+        if (req.status.includes('approved') || req.status === 'executed' || req.status === 'planned') {
+            statusClass = 'status-approved';
+        } else if (req.status.includes('rejected')) {
+            statusClass = 'status-rejected';
+        }
+
         const date = new Date(req.created_at).toLocaleDateString('pt-BR');
-        
-        // LÓGICA DE CLASSE DA LINHA
         const rowClass = req.status === 'pending_manager_check' ? 'row-pending-check' : '';
 
         let managerCheckHTML = '';
@@ -8754,7 +8766,7 @@ async function loadRequestManagementPage() {
         const canManageRequest = isAdmin || p.includes(`mgt_${req.type}`);
         const finalStatus = (req.status === 'pending_manager_check' && checkedRequestIds.has(req.id)) ? 'pending' : req.status;
 
-        if (canManageRequest && (finalStatus === 'pending' || (finalStatus === 'pending_manager_check' && canManageRequest))) {
+        if (canManageRequest && (finalStatus === 'pending' || finalStatus === 'pending_manager_check' || finalStatus === 'pending_final_approval')) {
              if (req.type !== 'maintenance') {
                 actionsHTML += `
                     <button class="btn btn-icon" title="Reprovar Requisição" onclick="openApprovalModal('reject', '${req.id}')"><span class="material-icons" style="color:var(--color-danger);">thumb_down</span></button>
