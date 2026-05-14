@@ -5551,12 +5551,32 @@ async function openRequestDetailsModal(requestId) {
         // ETAPA 1: ABERTURA (ORGANIZADA)
         const transForm = { setor: 'Setor', equipamento: 'Equipamento', situacao_maquina: 'Situação Máquina', descricao_problema: 'Problema', setor_especificado: 'Setor Especificado', funcao: 'Função', quantidade: 'Vagas', valor_total_calculado_rh: 'Valor (RH)', quantidade_horas_calculadas_rh: 'Horas (RH)', calculado_por_rh: 'Cálculo por (RH)', observacoes_rh: 'Observações (RH)' };
         let formDataHTML = `<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px 15px; margin-top: 12px; background: var(--color-background); padding: 12px; border-radius: 8px; border: 1px solid var(--color-border);">`;
-        for (const key in request.data) {
-            if (request.data[key] && !['tecnicos_planejados', 'changed_by_name'].includes(key)) { 
+        
+        // Renderiza campos originais
+        const originalKeys = Object.keys(request.data).filter(k => !k.includes('_rh'));
+        originalKeys.forEach(key => {
+            if (request.data[key] && !['tecnicos_planejados', 'changed_by_name'].includes(key)) {
                 const label = transForm[key] || key.replace(/_/g, ' ');
-                formDataHTML += `<div style="margin-bottom: 2px; ${key === 'observacoes_rh' ? 'grid-column: 1 / -1;' : ''}"><label style="font-size:0.55rem; color: var(--color-text-secondary); display:block; text-transform: uppercase; font-weight: 700;">${label}</label><span style="font-weight: 600; font-size: 0.8rem; color: var(--color-text-primary); line-height: 1.4; white-space: pre-wrap;">${request.data[key]}</span></div>`;
+                formDataHTML += `<div style="margin-bottom: 2px;"><label style="font-size:0.55rem; color: var(--color-text-secondary); display:block; text-transform: uppercase; font-weight: 700;">${label}</label><span style="font-weight: 600; font-size: 0.8rem; color: var(--color-text-primary); line-height: 1;">${request.data[key]}</span></div>`;
             }
+        });
+
+        // Renderiza campos do RH se existirem, com formatação específica
+        const rhKeys = Object.keys(request.data).filter(k => k.includes('_rh'));
+        if (rhKeys.length > 0) {
+            // Observações em linha cheia
+            if (request.data.observacoes_rh) {
+                 formDataHTML += `<div style="grid-column: 1 / -1; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--color-border);"><label style="font-size:0.55rem; color: var(--color-text-secondary); display:block; text-transform: uppercase; font-weight: 700;">${transForm['observacoes_rh']}</label><span style="font-weight: 600; font-size: 0.8rem; color: var(--color-text-primary); line-height: 1.4; white-space: pre-wrap;">${request.data.observacoes_rh}</span></div>`;
+            }
+            // Outros campos do RH
+            rhKeys.forEach(key => {
+                if (key !== 'observacoes_rh' && request.data[key]) {
+                    const label = transForm[key] || key.replace(/_/g, ' ');
+                    formDataHTML += `<div style="margin-bottom: 2px;"><label style="font-size:0.55rem; color: var(--color-text-secondary); display:block; text-transform: uppercase; font-weight: 700;">${label}</label><span style="font-weight: 600; font-size: 0.8rem; color: var(--color-text-primary); line-height: 1;">${request.data[key]}</span></div>`;
+                }
+            });
         }
+        
         formDataHTML += `</div>`;
 
         timelineHTML += `
