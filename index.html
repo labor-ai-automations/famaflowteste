@@ -5771,11 +5771,15 @@ async function openRequestDetailsModal(requestId) {
 
         if (canGiveCheck) footerActionsHTML += `<button class="btn btn-check-science" onclick="processManagerCheck('${request.id}')">Dar Check de Ciência</button>`;
         
-        if (canManageRequest && (finalStatus === 'pending' || (isManagerCheckPending && canManageRequest) || finalStatus === 'pending_final_approval')) {
+        if (canManageRequest && (finalStatus === 'pending' || (isManagerCheckPending && canManageRequest) || finalStatus === 'pending_final_approval' || finalStatus === 'executed')) {
             if (request.type === 'maintenance') {
-                if (finalStatus === 'pending') footerActionsHTML += `<button class="btn btn-warning" onclick="openMaintenancePlanningModal('${request.id}')">Planejar</button>`;
-                else if (finalStatus === 'planned') footerActionsHTML += `<button class="btn btn-success" onclick="executeMaintenanceRequestHandler('${request.id}')">Executar Manutenção</button>`;
-                else if (finalStatus === 'executed') footerActionsHTML += `<button class="btn btn-secondary" onclick="generateMaintenancePDF('${request.id}', this)"><span class="material-icons" style="font-size:18px;">picture_as_pdf</span> Exportar PDF</button>`;
+                if (finalStatus === 'pending') {
+                    footerActionsHTML += `<button class="btn btn-warning" onclick="openMaintenancePlanningModal('${request.id}')">Planejar</button>`;
+                } else if (finalStatus === 'planned') {
+                    footerActionsHTML += `<button class="btn btn-success" onclick="executeMaintenanceRequestHandler('${request.id}')">Executar Manutenção</button>`;
+                } else if (finalStatus === 'executed') {
+                    footerActionsHTML += `<button class="btn btn-secondary" onclick="generateMaintenancePDF('${request.id}', this)"><span class="material-icons" style="font-size:18px;">picture_as_pdf</span> Exportar PDF</button>`;
+                }
             } else {
                  if(!canGiveCheck || canManageRequest || isFinalApprover) {
                     footerActionsHTML += `
