@@ -230,6 +230,17 @@ let currentEditingKBId = null; // Controle para saber se estamos editando na KB
         .btn-check-science { background-color: var(--color-surface); color: var(--color-success); border: 1px solid var(--color-success); }
         .btn-check-science:hover { background-color: var(--color-success-bg); }
         .btn-warning { background-color: var(--color-warning); color: white; }
+
+        /* NOVO: Destaque para linha aguardando gerente */
+        .row-pending-check {
+            background-color: var(--color-warning-bg) !important;
+            border-left: 4px solid var(--color-warning);
+        }
+        .row-pending-check td {
+            border-top: 1px solid var(--color-warning) !important;
+            border-bottom: 1px solid var(--color-warning) !important;
+        }
+
         .fab { position: fixed; right: 3rem; bottom: 3rem; width: 56px; height: 56px; background-color: var(--color-brand-primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 20px rgba(0,0,0,0.15); cursor: pointer; border: none; z-index: 100; transition: transform 0.2s; } .fab:hover { transform: scale(1.05); }
         .fab.hidden { display: none; }
         .modal-overlay { 
@@ -8691,8 +8702,6 @@ async function loadRequestManagementPage() {
     if(!tableBody) return;
     tableBody.innerHTML = `<tr><td colspan="5" class="empty-state">Carregando requisições...</td></tr>`;
 
-    // A segurança total (RLS e lógica de acesso) agora está na RPC.
-    // Ela retornará apenas as requisições que o usuário logado tem permissão para ver (como Gestor ou Middleman).
     const { data, error } = await supabaseClient.rpc('get_all_requests_for_viewing');
     if (error) { 
         tableBody.innerHTML = `<tr><td colspan="5" class="empty-state">Erro ao carregar dados.</td></tr>`;
@@ -8719,18 +8728,20 @@ async function loadRequestManagementPage() {
 
     const statusTranslations = {
         'pending': 'Pendente (RH)',
-        'pending_manager_check': 'Aguardando Check',
-        'pending_final_approval': 'Aprovação Final Pendente', // LINHA ADICIONADA
+        'pending_manager_check': 'Com Gerente', // TEXTO ATUALIZADO
+        'pending_final_approval': 'Aprovação Final Pendente',
         'approved': 'Aprovada', 'rejected': 'Recusada',
         'planned': 'Planejada', 'executed': 'Executada'
     };
 
-    // Removemos a filtragem 'filteredData' do frontend. Usamos os dados diretamente da RPC.
     tableBody.innerHTML = data.map(req => {
         let statusLabel = statusTranslations[req.status] || req.status;
         let statusClass = req.status.includes('approved') || req.status === 'executed' || req.status === 'planned' ? 'status-approved' : (req.status.includes('rejected') ? 'status-rejected' : 'status-pending');
         const date = new Date(req.created_at).toLocaleDateString('pt-BR');
         
+        // LÓGICA DE CLASSE DA LINHA
+        const rowClass = req.status === 'pending_manager_check' ? 'row-pending-check' : '';
+
         let managerCheckHTML = '';
         const rule = requestTypeSettingsCache.find(r => r.request_type === req.type);
         if (rule && rule.requires_manager_check) {
@@ -8740,10 +8751,9 @@ async function loadRequestManagementPage() {
         }
         
         let actionsHTML = `<button class="btn btn-secondary" onclick="openRequestDetailsModal('${req.id}')">Ver Detalhes</button>`;
-        const canManageRequest = isAdmin || p.includes(`mgt_${req.type}`); // Verifica se tem poder de decisão final
+        const canManageRequest = isAdmin || p.includes(`mgt_${req.type}`);
         const finalStatus = (req.status === 'pending_manager_check' && checkedRequestIds.has(req.id)) ? 'pending' : req.status;
 
-        // Ações rápidas só aparecem se tiver permissão de gestão (canManageRequest) e não for um Middleman
         if (canManageRequest && (finalStatus === 'pending' || (finalStatus === 'pending_manager_check' && canManageRequest))) {
              if (req.type !== 'maintenance') {
                 actionsHTML += `
@@ -8754,7 +8764,7 @@ async function loadRequestManagementPage() {
         }
 
         return `
-            <tr>
+            <tr class="${rowClass}">
                 <td>${req.requester_name || 'N/A'}</td>
                 <td><strong>${typeTranslations[req.type] || req.type}</strong>${managerCheckHTML}</td>
                 <td>${date}</td>
