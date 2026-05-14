@@ -5495,6 +5495,55 @@ async function submitOvertimeCalculation(requestId) {
     }
 }
 
+async function submitOvertimeCalculation(requestId) {
+    const btn = event.target;
+    const valorTotal = document.getElementById('rh-valor-total').value;
+    const qtdHoras = document.getElementById('rh-qtd-horas').value;
+    const observacoes = document.getElementById('rh-observacoes').value.trim(); // ADICIONADO: Captura as observações
+
+    if (!valorTotal || !qtdHoras) {
+        showToast("Preencha o valor total e a quantidade de horas.", "warning");
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons refresh-spin">sync</span> Salvando...';
+
+    try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        const response = await fetch(N8N_SAVE_OVERTIME_CALCULATION_URL, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({
+                request_id: requestId,
+                valor_total: parseFloat(valorTotal),
+                quantidade_horas: parseFloat(qtdHoras),
+                calculado_por_nome: currentUserProfile.full_name,
+                observacoes_rh: observacoes // ADICIONADO: Envia o novo campo
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error("Falha ao salvar os cálculos. Tente novamente.");
+        }
+
+        showToast("Cálculo salvo! A requisição avançou para aprovação final.", "success");
+        
+        setTimeout(() => {
+            closeRequestModal();
+            loadRequestManagementPage();
+        }, 1500);
+
+    } catch (error) {
+        showToast(error.message, "danger");
+        btn.disabled = false;
+        btn.innerHTML = 'Salvar Cálculo e Avançar';
+    }
+}
+
 async function openRequestDetailsModal(requestId) {
     const modal = document.getElementById('request-modal');
     const modalTitle = document.getElementById('request-modal-title');
@@ -5552,7 +5601,6 @@ async function openRequestDetailsModal(requestId) {
         const transForm = { setor: 'Setor', equipamento: 'Equipamento', situacao_maquina: 'Situação Máquina', descricao_problema: 'Problema', setor_especificado: 'Setor Especificado', funcao: 'Função', quantidade: 'Vagas', valor_total_calculado_rh: 'Valor (RH)', quantidade_horas_calculadas_rh: 'Horas (RH)', calculado_por_rh: 'Cálculo por (RH)', observacoes_rh: 'Observações (RH)' };
         let formDataHTML = `<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px 15px; margin-top: 12px; background: var(--color-background); padding: 12px; border-radius: 8px; border: 1px solid var(--color-border);">`;
         
-        // Renderiza campos originais
         const originalKeys = Object.keys(request.data).filter(k => !k.includes('_rh'));
         originalKeys.forEach(key => {
             if (request.data[key] && !['tecnicos_planejados', 'changed_by_name'].includes(key)) {
@@ -5561,14 +5609,11 @@ async function openRequestDetailsModal(requestId) {
             }
         });
 
-        // Renderiza campos do RH se existirem, com formatação específica
         const rhKeys = Object.keys(request.data).filter(k => k.includes('_rh'));
         if (rhKeys.length > 0) {
-            // Observações em linha cheia
             if (request.data.observacoes_rh) {
                  formDataHTML += `<div style="grid-column: 1 / -1; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--color-border);"><label style="font-size:0.55rem; color: var(--color-text-secondary); display:block; text-transform: uppercase; font-weight: 700;">${transForm['observacoes_rh']}</label><span style="font-weight: 600; font-size: 0.8rem; color: var(--color-text-primary); line-height: 1.4; white-space: pre-wrap;">${request.data.observacoes_rh}</span></div>`;
             }
-            // Outros campos do RH
             rhKeys.forEach(key => {
                 if (key !== 'observacoes_rh' && request.data[key]) {
                     const label = transForm[key] || key.replace(/_/g, ' ');
