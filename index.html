@@ -836,6 +836,13 @@ let currentEditingKBId = null; // Controle para saber se estamos editando na KB
         .status-rejected { background-color: var(--color-danger-bg); color: var(--color-danger); }
         .status-planned { background-color: var(--color-info-bg); color: var(--color-info); }
         .status-executed { background-color: var(--color-success-bg); color: var(--color-success); }
+        
+        /* NOVO: Estilo para o status visual "Aguardando Peça" */
+        .status-awaiting-parts {
+            background-color: var(--color-info-bg);
+            color: var(--color-info);
+            border: 1px dashed var(--color-info);
+        }
 
         #request-modal .modal-content { max-width: 700px; }
         #request-modal .modal-body { max-height: 70vh; overflow-y: auto; }
@@ -8610,9 +8617,12 @@ document.querySelectorAll('#maintenance-filter-controls button').forEach(button 
             if (!tableBody || !paginationContainer) return;
         
             let filtered = allMaintenanceRequestsCache;
+            // LÓGICA DE FILTRO ATUALIZADA
             if (currentMaintenanceStatusFilter !== 'all') {
-                 if(currentMaintenanceStatusFilter === 'pending') {
+                if (currentMaintenanceStatusFilter === 'pending') {
                     filtered = allMaintenanceRequestsCache.filter(req => req.status === 'pending' || req.status === 'pending_manager_check');
+                } else if (currentMaintenanceStatusFilter === 'awaiting_parts') {
+                    filtered = allMaintenanceRequestsCache.filter(req => req.status === 'planned' && req.approval_notes && req.approval_notes.includes('[STATUS_FLAG: AGUARDANDO_PECA]'));
                 } else {
                     filtered = allMaintenanceRequestsCache.filter(req => req.status === currentMaintenanceStatusFilter);
                 }
@@ -8633,16 +8643,36 @@ document.querySelectorAll('#maintenance-filter-controls button').forEach(button 
             const statusTranslations = { 'pending': 'Pendente', 'planned': 'Planejada', 'executed': 'Executada', 'pending_manager_check': 'Com Gerente' };
 
             tableBody.innerHTML = paginatedItems.map(req => {
-                let statusLabel = statusTranslations[req.status] || req.status;
-                let statusClass = `status-${req.status}`;
+                const isAwaitingParts = req.status === 'planned' && req.approval_notes && req.approval_notes.includes('[STATUS_FLAG: AGUARDANDO_PECA]');
+
+                let statusLabel = isAwaitingParts ? 'Aguardando Peça' : (statusTranslations[req.status] || req.status);
+                let statusClass = isAwaitingParts ? 'status-awaiting-parts' : `status-${req.status}`;
                 if (req.status === 'pending_manager_check') statusClass = 'status-pending';
                 
                 const date = new Date(req.created_at).toLocaleDateString('pt-BR');
-                const technicians = req.data?.tecnicos_planejados || 'N/A';
+                
+                let technicians = (req.status === 'pending' || req.status === 'pending_manager_check')
+                    ? `<span style="color: var(--color-text-secondary); font-style: italic;">Pendente</span>`
+                    : (req.data?.tecnicos_planejados || 'N/A');
 
-                let actionsHTML = `<button class="btn btn-secondary" onclick="openRequestDetailsModal('${req.id}')">Ver Detalhes</button>`;
-                if (req.status === 'pending' || req.status === 'pending_manager_check') actionsHTML += `<button class="btn btn-warning" onclick="openMaintenancePlanningModal('${req.id}')">Planejar</button>`;
-                if (req.status === 'planned') actionsHTML += `<button class="btn btn-success" onclick="executeMaintenanceRequestHandler('${req.id}')">Executar</button>`;
+                const btnVerDetalhes = `<div style="width: 110px;"><button class="btn btn-secondary" onclick="openRequestDetailsModal('${req.id}')">Ver Detalhes</button></div>`;
+                let btnAcao = `<div style="width: 110px;"></div>`; // Placeholder
+                if (req.status === 'pending' || req.status === 'pending_manager_check') {
+                    btnAcao = `<div style="width: 110px;"><button class="btn btn-warning" onclick="openMaintenancePlanningModal('${req.id}')">Planejar</button></div>`;
+                }
+                if (req.status === 'planned' && !isAwaitingParts) {
+                    btnAcao = `<div style="width: 110px;"><button class="btn btn-success" onclick="executeMaintenanceRequestHandler('${req.id}')">Executar</button></div>`;
+                }
+
+                // Botão de Flag para "Aguardando Peça"
+                let btnFlag = `<div style="width: 40px;"></div>`; // Placeholder
+                if (req.status === 'planned') {
+                    if (isAwaitingParts) {
+                        btnFlag = `<div style="width: 40px;"><button class="btn btn-icon" title="Marcar como 'Peça Recebida'" onclick="toggleAwaitingPartsFlag('${req.id}', false)"><span class="material-icons" style="color: var(--color-danger);">label_off</span></button></div>`;
+                    } else {
+                        btnFlag = `<div style="width: 40px;"><button class="btn btn-icon" title="Marcar como 'Aguardando Peça'" onclick="toggleAwaitingPartsFlag('${req.id}', true)"><span class="material-icons" style="color: var(--color-info);">label</span></button></div>`;
+                    }
+                }
 
                 return `
                     <tr>
@@ -8652,7 +8682,11 @@ document.querySelectorAll('#maintenance-filter-controls button').forEach(button 
                         <td>${date}</td>
                         <td><span class="status-tag ${statusClass}">${statusLabel}</span></td>
                         <td style="position: sticky; right: 0; background: var(--color-surface); z-index: 2; text-align: right;">
-                            <div style="display:flex; align-items:center; gap:0.5rem; justify-content: flex-end;">${actionsHTML}</div>
+                            <div style="display:flex; align-items:center; gap:0.5rem; justify-content: flex-end;">
+                                ${btnFlag}
+                                ${btnVerDetalhes}
+                                ${btnAcao}
+                            </div>
                         </td>
                     </tr>
                 `;
@@ -8668,6 +8702,79 @@ document.querySelectorAll('#maintenance-filter-controls button').forEach(button 
         function changeMaintenancePage(direction) {
             currentMaintenancePage += direction;
             renderOptimizedMaintenanceTable();
+        }
+
+        async function toggleAwaitingPartsFlag(requestId, shouldAdd) {
+            const flag = '[STATUS_FLAG: AGUARDANDO_PECA]';
+            const request = allMaintenanceRequestsCache.find(r => r.id === requestId);
+            if (!request) return;
+
+            let newNotes = request.approval_notes || '';
+
+            if (shouldAdd) {
+                if (!newNotes.includes(flag)) {
+                    newNotes = newNotes ? `${newNotes} ${flag}` : flag;
+                }
+            } else {
+                newNotes = newNotes.replace(flag, '').trim();
+            }
+
+            try {
+                // Atualização Otimista da UI
+                request.approval_notes = newNotes;
+                renderOptimizedMaintenanceTable();
+
+                // Chamada ao Backend (n8n)
+                const { data: { session } } = await supabaseClient.auth.getSession();
+                const response = await fetch('https://n8n-n8n.znxk1t.easypanel.host/webhook/update-request-notes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}`},
+                    body: JSON.stringify({ request_id: requestId, notes: newNotes })
+                });
+
+                if (!response.ok) throw new Error("Falha ao atualizar o status visual.");
+                showToast(`Status visual ${shouldAdd ? 'adicionado' : 'removido'} com sucesso!`, 'success');
+
+            } catch (error) {
+                // Reverte a UI em caso de erro
+                showToast(error.message, 'danger');
+                const originalRequest = allMaintenanceRequestsCache.find(r => r.id === requestId);
+                if(originalRequest) originalRequest.approval_notes = request.approval_notes; // Reverte para o original
+                renderOptimizedMaintenanceTable();
+            }
+        }
+
+        // ATUALIZA A TABELA DO SOLICITANTE PARA TAMBÉM MOSTRAR O NOVO STATUS
+        function renderMaintenanceTable(containerId, requests, isManagerView = false) {
+            const tableBody = document.getElementById(containerId);
+            if (!tableBody) return;
+
+            if (!requests || requests.length === 0) {
+                const colspan = isManagerView ? 6 : 5;
+                tableBody.innerHTML = `<tr><td colspan="${colspan}" class="empty-state">Nenhuma solicitação encontrada.</td></tr>`;
+                return;
+            }
+
+            const statusTranslations = { 'pending': 'Pendente', 'planned': 'Planejada', 'executed': 'Executada' };
+
+            tableBody.innerHTML = requests.map(req => {
+                const isAwaitingParts = req.status === 'planned' && req.approval_notes && req.approval_notes.includes('[STATUS_FLAG: AGUARDANDO_PECA]');
+                let statusLabel = isAwaitingParts ? 'Aguardando Peça' : (statusTranslations[req.status] || req.status);
+                let statusClass = isAwaitingParts ? 'status-awaiting-parts' : `status-${req.status}`;
+                const date = new Date(req.created_at).toLocaleDateString('pt-BR');
+                
+                let actionsHTML = `<button class="btn btn-secondary" style="padding: 0.4rem 0.8rem;" onclick="openRequestDetailsModal('${req.id}')">Ver Detalhes</button>`;
+                
+                return `
+                        <tr>
+                            <td><strong>Manutenção</strong></td>
+                            <td>${req.data?.equipamento || 'N/A'}</td>
+                            <td>${date}</td>
+                            <td><span class="status-tag ${statusClass}">${statusLabel}</span></td>
+                            <td><div style="display:flex; align-items:center; gap:0.5rem;">${actionsHTML}</div></td>
+                        </tr>
+                    `;
+            }).join('');
         }
 
         function openMaintenanceExecutionModal(requestId) {
