@@ -8533,7 +8533,7 @@ async function saveTechnician() {
     }
 }
 
-let allMaintenanceRequestsCache = [];
+        let allMaintenanceRequestsCache = [];
         let currentMaintenancePage = 1;
         const maintenanceItemsPerPage = 10;
         let currentMaintenanceStatusFilter = 'all';
@@ -8550,7 +8550,7 @@ let allMaintenanceRequestsCache = [];
             document.getElementById('tab-btn-technicians').style.display = (isAdmin || p.includes('manage_technicians')) ? 'block' : 'none';
             document.getElementById('tab-btn-preventive').style.display = (isAdmin || p.includes('manage_preventive_schedules')) ? 'block' : 'none';
 
-            // --- Carrega dados da aba "Minhas Solicitações" (sem alterações) ---
+            // --- Carrega dados da aba "Minhas Solicitações" ---
             const myRequestsBody = document.getElementById('my-maintenance-table-body');
             myRequestsBody.innerHTML = `<tr><td colspan="5" class="empty-state">Carregando...</td></tr>`;
             const { data: myReqs, error: myReqsError } = await supabaseClient.rpc('get_my_requests');
@@ -8591,18 +8591,11 @@ let allMaintenanceRequestsCache = [];
                         </table>
                     </div>`;
 
-document.querySelectorAll('#maintenance-filter-controls button').forEach(button => {
+                document.querySelectorAll('#maintenance-filter-controls button').forEach(button => {
                     button.addEventListener('click', () => {
                         currentMaintenanceStatusFilter = button.dataset.status;
                         currentMaintenancePage = 1;
-                        
-                        // Remove a classe 'active' e reseta para o estilo padrão 'btn-secondary'
-                        document.querySelectorAll('#maintenance-filter-controls button').forEach(b => {
-                            b.classList.remove('active');
-                            // Garante que o estilo base seja sempre o secundário antes de aplicar a cor
-                            b.classList.add('btn-secondary'); 
-                        });
-
+                        document.querySelectorAll('#maintenance-filter-controls button').forEach(b => {b.classList.remove('active'); b.blur(); });
                         button.classList.add('active');
                         renderOptimizedMaintenanceTable();
                     });
@@ -8632,7 +8625,6 @@ document.querySelectorAll('#maintenance-filter-controls button').forEach(button 
             if (!tableBody || !paginationContainer) return;
         
             let filtered = allMaintenanceRequestsCache;
-            // LÓGICA DE FILTRO ATUALIZADA
             if (currentMaintenanceStatusFilter !== 'all') {
                 if (currentMaintenanceStatusFilter === 'pending') {
                     filtered = allMaintenanceRequestsCache.filter(req => req.status === 'pending' || req.status === 'pending_manager_check');
@@ -8724,6 +8716,7 @@ document.querySelectorAll('#maintenance-filter-controls button').forEach(button 
             const request = allMaintenanceRequestsCache.find(r => r.id === requestId);
             if (!request) return;
 
+            const originalNotes = request.approval_notes;
             let newNotes = request.approval_notes || '';
 
             if (shouldAdd) {
@@ -8753,13 +8746,11 @@ document.querySelectorAll('#maintenance-filter-controls button').forEach(button 
             } catch (error) {
                 // Reverte a UI em caso de erro
                 showToast(error.message, 'danger');
-                const originalRequest = allMaintenanceRequestsCache.find(r => r.id === requestId);
-                if(originalRequest) originalRequest.approval_notes = request.approval_notes; // Reverte para o original
+                request.approval_notes = originalNotes;
                 renderOptimizedMaintenanceTable();
             }
         }
 
-        // ATUALIZA A TABELA DO SOLICITANTE PARA TAMBÉM MOSTRAR O NOVO STATUS
         function renderMaintenanceTable(containerId, requests, isManagerView = false) {
             const tableBody = document.getElementById(containerId);
             if (!tableBody) return;
