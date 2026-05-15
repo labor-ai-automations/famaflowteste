@@ -8487,11 +8487,6 @@ let allMaintenanceRequestsCache = [];
         const maintenanceItemsPerPage = 10;
         let currentMaintenanceStatusFilter = 'all';
 
-        let allMaintenanceRequestsCache = [];
-        let currentMaintenancePage = 1;
-        const maintenanceItemsPerPage = 10;
-        let currentMaintenanceStatusFilter = 'all';
-
         async function loadMaintenancePage() {
             const p = currentUserProfile.permissions || [];
             const isAdmin = p.includes('manage_users');
