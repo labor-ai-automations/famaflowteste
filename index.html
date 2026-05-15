@@ -8696,13 +8696,23 @@ let allMaintenanceRequestsCache = [];
                 
                 const date = new Date(req.created_at).toLocaleDateString('pt-BR');
                 
-                // --- CORREÇÃO APLICADA AQUI ---
-                // Extração correta dos técnicos a partir do campo 'data' (JSONB)
-                const technicians = req.data?.tecnicos_planejados || 'N/A';
+                // LÓGICA REFINADA PARA TÉCNICOS
+                let technicians;
+                if (req.status === 'pending' || req.status === 'pending_manager_check') {
+                    technicians = `<span style="color: var(--color-text-secondary); font-style: italic;">Pendente</span>`;
+                } else {
+                    technicians = req.data?.tecnicos_planejados || 'N/A';
+                }
 
-                let actionsHTML = `<button class="btn btn-secondary" onclick="openRequestDetailsModal('${req.id}')">Ver Detalhes</button>`;
-                if (req.status === 'pending' || req.status === 'pending_manager_check') actionsHTML += `<button class="btn btn-warning" onclick="openMaintenancePlanningModal('${req.id}')">Planejar</button>`;
-                if (req.status === 'planned') actionsHTML += `<button class="btn btn-success" onclick="executeMaintenanceRequestHandler('${req.id}')">Executar</button>`;
+                // LÓGICA REFINADA PARA BOTÕES DE AÇÃO
+                const btnVerDetalhes = `<div style="width: 110px;"><button class="btn btn-secondary" onclick="openRequestDetailsModal('${req.id}')">Ver Detalhes</button></div>`;
+                let btnAcao = `<div style="width: 110px;"></div>`; // Placeholder
+                if (req.status === 'pending' || req.status === 'pending_manager_check') {
+                    btnAcao = `<div style="width: 110px;"><button class="btn btn-warning" onclick="openMaintenancePlanningModal('${req.id}')">Planejar</button></div>`;
+                }
+                if (req.status === 'planned') {
+                    btnAcao = `<div style="width: 110px;"><button class="btn btn-success" onclick="executeMaintenanceRequestHandler('${req.id}')">Executar</button></div>`;
+                }
 
                 return `
                     <tr>
@@ -8712,7 +8722,10 @@ let allMaintenanceRequestsCache = [];
                         <td>${date}</td>
                         <td><span class="status-tag ${statusClass}">${statusLabel}</span></td>
                         <td style="position: sticky; right: 0; background: var(--color-surface); z-index: 2; text-align: right;">
-                            <div style="display:flex; align-items:center; gap:0.5rem; justify-content: flex-end;">${actionsHTML}</div>
+                            <div style="display:flex; align-items:center; gap:0.5rem; justify-content: flex-end;">
+                                ${btnVerDetalhes}
+                                ${btnAcao}
+                            </div>
                         </td>
                     </tr>
                 `;
