@@ -259,18 +259,32 @@ let currentEditingKBId = null; // Controle para saber se estamos editando na KB
         }
 
         /* Cores dinâmicas para os botões de filtro ativos */
+        #maintenance-filter-controls .btn {
+            border: 1px solid var(--color-border);
+        }
         #maintenance-filter-controls .btn.active {
-             color: white;
-             border-color: transparent;
+             color: white !important;
+             border-color: transparent !important;
+             font-weight: 700;
         }
         #maintenance-filter-controls .btn.active[data-status="all"] {
-            background-color: var(--color-text-secondary);
+            background-color: var(--color-text-primary);
         }
         #maintenance-filter-controls .btn.active[data-status="pending"] {
             background-color: var(--color-warning);
+            color: black !important;
         }
         #maintenance-filter-controls .btn.active[data-status="planned"] {
             background-color: var(--color-info);
+        }
+         #maintenance-filter-controls .btn.active[data-status="awaiting_parts"] {
+            background-color: var(--color-info);
+            border: 2px dashed var(--color-info) !important;
+            color: var(--color-info) !important;
+            background-color: var(--color-info-bg) !important;
+        }
+        body.dark-mode #maintenance-filter-controls .btn.active[data-status="awaiting_parts"] {
+             color: white !important;
         }
         #maintenance-filter-controls .btn.active[data-status="executed"] {
             background-color: var(--color-success);
@@ -8556,6 +8570,7 @@ let allMaintenanceRequestsCache = [];
                             <button class="btn btn-secondary active" data-status="all">Todos</button>
                             <button class="btn btn-secondary" data-status="pending">Pendentes</button>
                             <button class="btn btn-secondary" data-status="planned">Planejadas</button>
+                            <button class="btn btn-secondary" data-status="awaiting_parts">Aguardando Peça</button>
                             <button class="btn btn-secondary" data-status="executed">Executadas</button>
                         </div>
                         <div id="maintenance-pagination-controls" style="display: flex; align-items: center; gap: 0.5rem;"></div>
