@@ -246,6 +246,36 @@ let currentEditingKBId = null; // Controle para saber se estamos editando na KB
             color: var(--color-text-primary) !important;
         }
 
+        /* --- NOVOS ESTILOS PARA INTERATIVIDADE DA TABELA --- */
+        /* Efeito de hover nas linhas da tabela de manutenção */
+        #manage-maintenance-table-body tr:hover {
+            background-color: var(--color-background);
+            transform: scale(1.01);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            transition: all 0.2s ease-out;
+        }
+        #manage-maintenance-table-body tr {
+             transition: all 0.2s ease-out;
+        }
+
+        /* Cores dinâmicas para os botões de filtro ativos */
+        #maintenance-filter-controls .btn.active {
+             color: white;
+             border-color: transparent;
+        }
+        #maintenance-filter-controls .btn.active[data-status="all"] {
+            background-color: var(--color-text-secondary);
+        }
+        #maintenance-filter-controls .btn.active[data-status="pending"] {
+            background-color: var(--color-warning);
+        }
+        #maintenance-filter-controls .btn.active[data-status="planned"] {
+            background-color: var(--color-info);
+        }
+        #maintenance-filter-controls .btn.active[data-status="executed"] {
+            background-color: var(--color-success);
+        }
+
         .fab { position: fixed; right: 3rem; bottom: 3rem; width: 56px; height: 56px; background-color: var(--color-brand-primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 20px rgba(0,0,0,0.15); cursor: pointer; border: none; z-index: 100; transition: transform 0.2s; } .fab:hover { transform: scale(1.05); }
         .fab.hidden { display: none; }
         .modal-overlay { 
@@ -8539,11 +8569,18 @@ let allMaintenanceRequestsCache = [];
                         </table>
                     </div>`;
 
-                document.querySelectorAll('#maintenance-filter-controls button').forEach(button => {
+document.querySelectorAll('#maintenance-filter-controls button').forEach(button => {
                     button.addEventListener('click', () => {
                         currentMaintenanceStatusFilter = button.dataset.status;
                         currentMaintenancePage = 1;
-                        document.querySelectorAll('#maintenance-filter-controls button').forEach(b => {b.classList.remove('active'); b.blur(); });
+                        
+                        // Remove a classe 'active' e reseta para o estilo padrão 'btn-secondary'
+                        document.querySelectorAll('#maintenance-filter-controls button').forEach(b => {
+                            b.classList.remove('active');
+                            // Garante que o estilo base seja sempre o secundário antes de aplicar a cor
+                            b.classList.add('btn-secondary'); 
+                        });
+
                         button.classList.add('active');
                         renderOptimizedMaintenanceTable();
                     });
