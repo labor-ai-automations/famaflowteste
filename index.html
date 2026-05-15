@@ -8827,8 +8827,10 @@ document.querySelectorAll('#maintenance-filter-controls button').forEach(button 
         
             let filtered = allMaintenanceRequestsCache;
             if (currentMaintenanceStatusFilter !== 'all') {
-                if(currentMaintenanceStatusFilter === 'pending') {
+                if (currentMaintenanceStatusFilter === 'pending') {
                     filtered = allMaintenanceRequestsCache.filter(req => req.status === 'pending' || req.status === 'pending_manager_check');
+                } else if (currentMaintenanceStatusFilter === 'awaiting_parts') {
+                    filtered = allMaintenanceRequestsCache.filter(req => req.status === 'planned' && req.approval_notes && req.approval_notes.includes('[STATUS_FLAG: AGUARDANDO_PECA]'));
                 } else {
                     filtered = allMaintenanceRequestsCache.filter(req => req.status === currentMaintenanceStatusFilter);
                 }
@@ -8849,28 +8851,35 @@ document.querySelectorAll('#maintenance-filter-controls button').forEach(button 
             const statusTranslations = { 'pending': 'Pendente', 'planned': 'Planejada', 'executed': 'Executada', 'pending_manager_check': 'Com Gerente' };
 
             tableBody.innerHTML = paginatedItems.map(req => {
-                let statusLabel = statusTranslations[req.status] || req.status;
-                let statusClass = `status-${req.status}`;
+                const isAwaitingParts = req.status === 'planned' && req.approval_notes && req.approval_notes.includes('[STATUS_FLAG: AGUARDANDO_PECA]');
+
+                let statusLabel = isAwaitingParts ? 'Aguardando Peça' : (statusTranslations[req.status] || req.status);
+                let statusClass = isAwaitingParts ? 'status-awaiting-parts' : `status-${req.status}`;
                 if (req.status === 'pending_manager_check') statusClass = 'status-pending';
                 
                 const date = new Date(req.created_at).toLocaleDateString('pt-BR');
                 
-                // LÓGICA REFINADA PARA TÉCNICOS
-                let technicians;
-                if (req.status === 'pending' || req.status === 'pending_manager_check') {
-                    technicians = `<span style="color: var(--color-text-secondary); font-style: italic;">Pendente</span>`;
-                } else {
-                    technicians = req.data?.tecnicos_planejados || 'N/A';
-                }
+                let technicians = (req.status === 'pending' || req.status === 'pending_manager_check')
+                    ? `<span style="color: var(--color-text-secondary); font-style: italic;">Pendente</span>`
+                    : (req.data?.tecnicos_planejados || 'N/A');
 
-                // LÓGICA REFINADA PARA BOTÕES DE AÇÃO
                 const btnVerDetalhes = `<div style="width: 110px;"><button class="btn btn-secondary" onclick="openRequestDetailsModal('${req.id}')">Ver Detalhes</button></div>`;
                 let btnAcao = `<div style="width: 110px;"></div>`; // Placeholder
                 if (req.status === 'pending' || req.status === 'pending_manager_check') {
                     btnAcao = `<div style="width: 110px;"><button class="btn btn-warning" onclick="openMaintenancePlanningModal('${req.id}')">Planejar</button></div>`;
                 }
-                if (req.status === 'planned') {
+                if (req.status === 'planned' && !isAwaitingParts) {
                     btnAcao = `<div style="width: 110px;"><button class="btn btn-success" onclick="executeMaintenanceRequestHandler('${req.id}')">Executar</button></div>`;
+                }
+
+                // LÓGICA DO BOTÃO DE FLAG ADICIONADA AQUI
+                let btnFlag = `<div style="width: 40px;"></div>`; // Placeholder
+                if (req.status === 'planned') {
+                    if (isAwaitingParts) {
+                        btnFlag = `<div style="width: 40px;"><button class="btn btn-icon" title="Marcar como 'Peça Recebida'" onclick="toggleAwaitingPartsFlag('${req.id}', false)"><span class="material-icons" style="color: var(--color-danger);">label_off</span></button></div>`;
+                    } else {
+                        btnFlag = `<div style="width: 40px;"><button class="btn btn-icon" title="Marcar como 'Aguardando Peça'" onclick="toggleAwaitingPartsFlag('${req.id}', true)"><span class="material-icons" style="color: var(--color-info);">label</span></button></div>`;
+                    }
                 }
 
                 return `
@@ -8882,6 +8891,7 @@ document.querySelectorAll('#maintenance-filter-controls button').forEach(button 
                         <td><span class="status-tag ${statusClass}">${statusLabel}</span></td>
                         <td style="position: sticky; right: 0; background: var(--color-surface); z-index: 2; text-align: right;">
                             <div style="display:flex; align-items:center; gap:0.5rem; justify-content: flex-end;">
+                                ${btnFlag}
                                 ${btnVerDetalhes}
                                 ${btnAcao}
                             </div>
