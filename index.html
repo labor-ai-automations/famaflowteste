@@ -8318,7 +8318,21 @@ async function executeMaintenanceRequestHandler(requestId) {
             }
         }
 
-function renderMaintenanceTable(containerId, requests, isManagerView = false) {
+async function openEvaluationModal(requestId) {
+            // Primeiro, abre o modal de detalhes normalmente
+            await openRequestDetailsModal(requestId);
+            
+            // Depois que o modal estiver visível e renderizado, encontra o formulário e rola até ele
+            setTimeout(() => {
+                const feedbackForm = document.getElementById('fb-comment');
+                if (feedbackForm) {
+                    feedbackForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    feedbackForm.focus(); // Opcional: foca no campo de comentário
+                }
+            }, 300); // Um pequeno delay para garantir que a UI foi renderizada
+        }
+
+        function renderMaintenanceTable(containerId, requests, isManagerView = false) {
             const tableBody = document.getElementById(containerId);
             if (!tableBody) return;
 
@@ -8338,23 +8352,26 @@ function renderMaintenanceTable(containerId, requests, isManagerView = false) {
                 const isAwaitingParts = req.status === 'planned' && req.approval_notes && req.approval_notes.includes('[STATUS_FLAG: AGUARDANDO_PECA]');
                 let statusLabel = isAwaitingParts ? 'Peça Pendente' : (statusLabels[req.status] || req.status);
                 let statusClass = isAwaitingParts ? 'status-peca-pendente' : `status-${req.status}`;
+
                 const date = new Date(req.created_at).toLocaleDateString('pt-BR');
                 
                 let actionsHTML = `<button class="btn btn-secondary" style="padding: 0.4rem 0.8rem;" onclick="openRequestDetailsModal('${req.id}')">Ver Detalhes</button>`;
-
-                // Adiciona o botão "Avaliar" apenas na visão do solicitante (isManagerView = false)
-                if (!isManagerView && req.status === 'executed' && !req.feedback_at) {
-                    actionsHTML += `<button class="btn btn-warning" style="padding: 0.4rem 0.8rem;" onclick="openRequestDetailsModal('${req.id}')">Avaliar</button>`;
-                }
-
+                
                 if (isManagerView) {
-                    // Lógica para a visão do gestor permanece aqui, mas não é o foco desta alteração
                     if (req.status === 'pending') {
                         actionsHTML += `<button class="btn btn-warning" style="padding: 0.4rem 0.8rem;" onclick="openMaintenancePlanningModal('${req.id}')">Planejar</button>`;
                     } else if (req.status === 'planned') {
                         actionsHTML += `<button class="btn btn-success" style="padding: 0.4rem 0.8rem;" onclick="executeMaintenanceRequestHandler('${req.id}')">Executar</button>`;
                     }
-                     return `
+                } else {
+                    // Adiciona o botão "Avaliar" apenas na visão do solicitante
+                    if (req.status === 'executed' && !req.feedback_at) {
+                        actionsHTML += `<button class="btn btn-warning" style="padding: 0.4rem 0.8rem;" onclick="openEvaluationModal('${req.id}')">Avaliar</button>`;
+                    }
+                }
+
+                if (isManagerView) {
+                    return `
                         <tr>
                             <td><strong>Manutenção</strong></td>
                             <td>${req.requester_name || 'N/A'}</td>
@@ -8365,7 +8382,6 @@ function renderMaintenanceTable(containerId, requests, isManagerView = false) {
                         </tr>
                     `;
                 } else {
-                    // Renderização para a visão do solicitante
                     return `
                         <tr>
                             <td><strong>Manutenção</strong></td>
