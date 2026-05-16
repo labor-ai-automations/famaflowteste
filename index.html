@@ -8744,8 +8744,9 @@ async function executeMaintenanceRequestHandler(requestId) {
 
             // ATIVA O CARREGAMENTO DO DASHBOARD
             if (tabId === 'dashboard') {
-                // Apenas chama a função se ela não tiver sido chamada ainda para evitar múltiplas execuções
-                if (!document.getElementById('dashboard-kpi-cards').hasChildNodes()) {
+                // Verifica se o primeiro KPI já foi preenchido para evitar múltiplas execuções
+                const kpiCriadas = document.getElementById('kpi-criadas');
+                if (kpiCriadas && kpiCriadas.innerHTML.trim() === '') {
                     loadMaintenanceDashboard();
                 }
             }
@@ -12613,7 +12614,7 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
             // -------------------------------------------------------------
             const { data: kpiData, error } = await supabaseClient.rpc('get_maintenance_dashboard_kpis', {
                 start_date: startDateStr,
-                end_date: endDateStr + 'T23:59:59',
+                end_date: endDateStr, // Enviando apenas a data 'YYYY-MM-DD' conforme o SQL espera
                 p_setor: currentDashboardFilters.setor
             }).single();
 
