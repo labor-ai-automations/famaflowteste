@@ -3276,7 +3276,10 @@ function showPage(pageId, targetUserId = null) {
             }
             if (pageId === 'kb-page') loadKBPage();
             if (pageId === 'users-page') loadUsersForAdmin(); 
-            if (pageId === 'maintenance-page') loadMaintenancePage();
+            if (pageId === 'maintenance-page') {
+                loadMaintenancePage(); // Prepara a página
+                setTimeout(loadMaintenanceDashboard, 100); // Garante que o dashboard carregue na primeira vez
+            }
 			if (pageId === 'feedback-page') loadFeedbackPage();
         }
 		
