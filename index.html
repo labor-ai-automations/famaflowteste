@@ -5333,7 +5333,14 @@ async function loadRequests() {
 
         // Lógica de cores específica para o novo status
         if (req.status === 'pending_manager_check') {
-            statusClass = 'status-pending'; // Usa a cor amarela de pendente
+            if (req.manager_checked_at) {
+                // Se o check já foi dado, exibe como "Pendente (RH)"
+                statusLabel = statusLabels['pending'];
+                statusClass = 'status-pending';
+            } else {
+                // Se o check ainda não foi dado, mantém "Aguardando Check"
+                statusClass = 'status-pending';
+            }
         }
         
         const typeLabel = requestTypeLabels[req.type] || req.type;
