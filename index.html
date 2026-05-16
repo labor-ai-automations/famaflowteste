@@ -12209,7 +12209,7 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
             const { data, error } = await supabaseClient.rpc('get_maintenance_dashboard_kpis', {
                 start_date: startDateInput.value,
                 end_date: endDateInput.value + 'T23:59:59'
-            });
+            }).single();
 
             if (error) {
                 console.error("Erro ao carregar KPIs do dashboard:", error);
