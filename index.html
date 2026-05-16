@@ -2693,7 +2693,7 @@ const appHTML = `<div id="app-container">
                             </div>
                             <div class="card chart-card">
                                 <div class="chart-header">
-                                    <h4>Top 5 Equipamentos com Mais Chamados</h4>
+                                    <h4>Top 5 Setores com Mais Chamados</h4>
                                     <span class="chart-icon">⚙️</span>
                                 </div>
                                 <div id="list-top-equipments" class="equipment-list"></div>
@@ -12286,15 +12286,16 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
                 </div>
             `;
             
-            // Renderiza a lista de Top Equipamentos com verificação
-            if(data.topEquipments && Array.isArray(data.topEquipments) && data.topEquipments.length > 0) {
-                topEquipmentsList.innerHTML = data.topEquipments.map(item => `
+// Renderiza a lista de Top Setores
+            const topSectorsList = document.getElementById('list-top-equipments'); // Mantemos o ID do elemento para não precisar alterar o HTML
+            if(data.topSectors && Array.isArray(data.topSectors) && data.topSectors.length > 0) {
+                topSectorsList.innerHTML = data.topSectors.map(item => `
                     <div style="display:flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--color-border);">
-                        <strong>${item.equipamento}</strong>
+                        <strong>${item.setor}</strong>
                         <span>${item.total} chamados</span>
                     </div>`).join('');
             } else {
-                topEquipmentsList.innerHTML = `<div class="empty-state" style="padding:1rem 0;">Sem dados de equipamentos no período.</div>`;
+                topSectorsList.innerHTML = `<div class="empty-state" style="padding:1rem 0;">Sem dados de setores no período.</div>`;
             }
 
             // Renderiza o Gráfico com verificação
