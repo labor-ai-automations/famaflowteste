@@ -2046,11 +2046,21 @@ async function generateMaintenancePDF(requestId, btnElement) {
 
         // NOVA FUNÇÃO: Envia a avaliação do solicitante para o n8n
         async function submitRequestFeedback(requestId) {
-            const rating = document.querySelector('input[name="fb-rating"]:checked')?.value;
+            const ratingInput = document.querySelector('input[name="fb-rating"]:checked');
+            const rating = ratingInput ? parseInt(ratingInput.value) : null;
             const comment = document.getElementById('fb-comment').value.trim();
             const btn = event.target;
 
-            if (!rating) { showToast("Por favor, selecione uma nota de 1 a 5.", "warning"); return; }
+            if (!rating) {
+                showToast("Por favor, selecione uma nota de 1 a 5.", "warning");
+                return;
+            }
+
+            // NOVA VALIDAÇÃO: Comentário obrigatório para notas < 4
+            if (rating < 4 && !comment) {
+                showToast("Para notas abaixo de 4, por favor, justifique no campo de observação para nos ajudar a melhorar.", "warning");
+                return;
+            }
 
             btn.disabled = true;
             btn.innerHTML = '<span class="material-icons refresh-spin">sync</span> Enviando...';
@@ -2060,13 +2070,17 @@ async function generateMaintenancePDF(requestId, btnElement) {
                 const response = await fetch(N8N_SAVE_REQUEST_FEEDBACK_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-                    body: JSON.stringify({ request_id: requestId, rating: parseInt(rating), comment: comment })
+                    body: JSON.stringify({ request_id: requestId, rating: rating, comment: comment })
                 });
 
-                if (!response.ok) throw new Error();
+                if (!response.ok) throw new Error("Falha ao salvar avaliação no servidor.");
 
                 showToast("Obrigado pela sua avaliação!", "success");
-                setTimeout(() => openRequestDetailsModal(requestId), 1000);
+                // Recarrega a lista principal para o botão "Avaliar" sumir
+                setTimeout(() => {
+                    closeRequestModal();
+                    loadMaintenancePage();
+                }, 1500);
             } catch (e) {
                 showToast("Erro ao salvar avaliação.", "danger");
                 btn.disabled = false;
@@ -8321,22 +8335,26 @@ function renderMaintenanceTable(containerId, requests, isManagerView = false) {
             };
 
             tableBody.innerHTML = requests.map(req => {
-                const statusLabel = statusLabels[req.status] || req.status;
-                const statusClass = `status-${req.status}`;
+                const isAwaitingParts = req.status === 'planned' && req.approval_notes && req.approval_notes.includes('[STATUS_FLAG: AGUARDANDO_PECA]');
+                let statusLabel = isAwaitingParts ? 'Peça Pendente' : (statusLabels[req.status] || req.status);
+                let statusClass = isAwaitingParts ? 'status-peca-pendente' : `status-${req.status}`;
                 const date = new Date(req.created_at).toLocaleDateString('pt-BR');
                 
                 let actionsHTML = `<button class="btn btn-secondary" style="padding: 0.4rem 0.8rem;" onclick="openRequestDetailsModal('${req.id}')">Ver Detalhes</button>`;
+
+                // Adiciona o botão "Avaliar" apenas na visão do solicitante (isManagerView = false)
+                if (!isManagerView && req.status === 'executed' && !req.feedback_at) {
+                    actionsHTML += `<button class="btn btn-warning" style="padding: 0.4rem 0.8rem;" onclick="openRequestDetailsModal('${req.id}')">Avaliar</button>`;
+                }
+
                 if (isManagerView) {
+                    // Lógica para a visão do gestor permanece aqui, mas não é o foco desta alteração
                     if (req.status === 'pending') {
                         actionsHTML += `<button class="btn btn-warning" style="padding: 0.4rem 0.8rem;" onclick="openMaintenancePlanningModal('${req.id}')">Planejar</button>`;
                     } else if (req.status === 'planned') {
                         actionsHTML += `<button class="btn btn-success" style="padding: 0.4rem 0.8rem;" onclick="executeMaintenanceRequestHandler('${req.id}')">Executar</button>`;
                     }
-                }
-
-                // CORREÇÃO: Estrutura condicional para renderizar a linha da tabela
-                if (isManagerView) {
-                    return `
+                     return `
                         <tr>
                             <td><strong>Manutenção</strong></td>
                             <td>${req.requester_name || 'N/A'}</td>
@@ -8347,6 +8365,7 @@ function renderMaintenanceTable(containerId, requests, isManagerView = false) {
                         </tr>
                     `;
                 } else {
+                    // Renderização para a visão do solicitante
                     return `
                         <tr>
                             <td><strong>Manutenção</strong></td>
