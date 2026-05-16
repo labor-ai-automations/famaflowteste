@@ -12701,6 +12701,9 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
                 `↳ Baseado em ${kpiData.csat.qtd} avaliações`
             );
 
+            // ---> LIGA A ANIMAÇÃO E REVELA OS CARDS <---
+            document.querySelectorAll('.stat-card').forEach((card, i) => setTimeout(() => card.classList.add('visible'), i * 50));
+
             // -------------------------------------------------------------
             // 4. TOP SETORES & GRÁFICO DE BARRAS
             // -------------------------------------------------------------
