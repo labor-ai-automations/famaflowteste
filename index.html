@@ -1651,7 +1651,153 @@ body.fullscreen-flow .flowchart-monitor-bar {
     .kpi-grid { grid-template-columns: 1fr; }
 }
 
+/* ================================================
+   INÍCIO - CSS DO DASHBOARD DE MANUTENÇÃO (v3 - BI)
+   ================================================ */
 
+/* Estrutura geral do Dashboard */
+.maintenance-dashboard { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 1rem; 
+}
+
+/* Barra de Filtros (Pequenos ajustes) */
+.dashboard-filter-bar {
+    padding: 0.75rem 1.25rem;
+}
+.filter-bar-title {
+    font-size: 1.2rem;
+}
+
+/* Grid de KPIs 2x4 */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.25rem;
+}
+
+/* Estilo individual para cada Card de KPI */
+.stat-card {
+    padding: 1.25rem;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: var(--color-surface);
+    transition: all 0.2s ease-in-out;
+}
+.stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow);
+    border-color: var(--color-brand-primary);
+}
+.stat-card .stat-info {
+    text-align: left;
+}
+.stat-card .stat-label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--color-text-secondary);
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.stat-card .stat-value {
+    font-size: 2.5rem;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--color-text-primary);
+}
+.stat-card--danger .stat-value { 
+    color: var(--color-danger); 
+}
+
+/* Estilos para a aba Análise da Equipe */
+.team-load-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
+}
+
+.technician-load-card {
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: var(--color-surface);
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.technician-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    border-bottom: 1px solid var(--color-background);
+    padding-bottom: 0.75rem;
+}
+
+.technician-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--color-info-bg);
+    color: var(--color-info);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+.technician-name {
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+.technician-status-card {
+    padding: 0.75rem;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.technician-status-card.status-available {
+    background-color: var(--color-success-bg);
+    border: 1px solid var(--color-success);
+    color: var(--color-success);
+}
+
+.technician-status-card.status-busy {
+    background-color: var(--color-warning-bg);
+    border: 1px solid var(--color-warning);
+}
+
+.technician-status-card .status-title {
+    font-weight: 800;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    margin-bottom: 0.25rem;
+}
+
+.technician-status-card .status-details {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--color-text-primary);
+}
+
+.technician-backlog-card {
+    text-align: center;
+    padding: 0.75rem;
+    border-radius: 8px;
+    background: var(--color-background);
+}
+
+.technician-backlog-card .backlog-value {
+    font-size: 1.5rem;
+    font-weight: 800;
+}
+/* ================================================
+   FIM - CSS DO DASHBOARD DE MANUTENÇÃO (v3 - BI)
+   ================================================ */
 		
     </style>
 </head>
@@ -2751,7 +2897,7 @@ const appHTML = `<div id="app-container">
                     </div>
 
                     <!-- Conteúdo das Abas -->
-                    <div id="maintenance-tab-my_requests" class="maintenance-tab-content">
+                    <div id="maintenance-tab-my_requests" class="maintenance-tab-content" style="display:none;">
                         <div class="card" style="padding:0;">
                             <table class="data-table">
                                 <thead><tr><th>Tipo</th><th>Equipamento/Infra</th><th>Data</th><th>Status</th><th>Ações</th></tr></thead>
@@ -2796,12 +2942,12 @@ const appHTML = `<div id="app-container">
                         <div class="empty-state">Calendário de Manutenção Preventiva - Em breve.</div>
                     </div>
                     
-                    <!-- NOVO DASHBOARD DE MANUTENÇÃO (REATORADO) -->
+                    <!-- INÍCIO DO NOVO DASHBOARD DE MANUTENÇÃO (REATORADO) -->
                     <div id="maintenance-tab-dashboard" class="maintenance-tab-content maintenance-dashboard">
     
                         <!-- SEÇÃO 1: BARRA DE FILTROS (COMPACTA) -->
                         <div class="dashboard-filter-bar">
-                            <h3 class="filter-bar-title">Dashboard de Manutenção</h3>
+                            <h3 class="filter-bar-title">Análise de Manutenção</h3>
                             <div class="filter-controls">
                                 <div class="form-group">
                                     <label for="dash-start-date">Data Início</label>
@@ -2816,30 +2962,75 @@ const appHTML = `<div id="app-container">
                                 </button>
                             </div>
                         </div>
-                    
-                        <!-- SEÇÃO 2: KPI GRID (4 COLUNAS) -->
-                        <div id="dashboard-kpi-cards" class="kpi-grid">
-                            <!-- Cards de KPI são injetados aqui -->
+
+                        <!-- ABAS INTERNAS DO DASHBOARD -->
+                        <div class="mgt-tabs" style="margin-top: 1.5rem; margin-bottom: 1rem;">
+                            <button class="mgt-tab-btn active" id="tab-btn-geral" onclick="switchDashboardTab('geral')">Dashboard Geral</button>
+                            <button class="mgt-tab-btn" id="tab-btn-equipe" onclick="switchDashboardTab('equipe')">Análise da Equipe</button>
                         </div>
-                    
-                        <!-- DIVISOR VISUAL SUTIL -->
-                        <div class="dashboard-divider"></div>
-                    
-                        <!-- SEÇÃO 3: ÁREA DE CHARTING (2 COLUNAS) -->
-                        <div class="charts-grid">
-                            <div class="card chart-card">
-                                <div class="chart-header">
-                                    <h4>Volume de OS por Dia</h4>
-                                    <span class="chart-icon">📊</span>
-                                </div>
-                                <canvas id="chart-os-volume"></canvas>
+
+                        <!-- CONTEÚDO DA ABA GERAL -->
+                        <div id="dashboard-tab-geral" class="dashboard-tab-content">
+                             <div class="kpi-grid" style="grid-template-rows: 1fr 1fr; gap: 1.25rem;">
+                                <!-- Linha de KPIs de Fluxo -->
+                                <div class="stat-card" id="kpi-criadas"></div>
+                                <div class="stat-card" id="kpi-pendentes"></div>
+                                <div class="stat-card" id="kpi-resolvidas"></div>
+                                <div class="stat-card stat-card--danger" id="kpi-paradas"></div>
+                                <!-- Linha de KPIs de Eficiência -->
+                                <div class="stat-card" id="kpi-mttp"></div>
+                                <div class="stat-card" id="kpi-mttr"></div>
+                                <div class="stat-card" id="kpi-aderencia"></div>
+                                <div class="stat-card" id="kpi-csat"></div>
                             </div>
-                            <div class="card chart-card">
-                                <div class="chart-header">
-                                    <h4>Top 5 Setores com Mais Chamados</h4>
-                                    <span class="chart-icon">⚙️</span>
+                            <div class="dashboard-divider"></div>
+                            <div class="charts-grid">
+                                <div class="card chart-card">
+                                    <div class="chart-header">
+                                        <h4>Volume de OS por Dia</h4>
+                                        <span class="chart-icon">📊</span>
+                                    </div>
+                                    <canvas id="chart-os-volume"></canvas>
                                 </div>
-                                <div id="list-top-equipments" class="equipment-list"></div>
+                                <div class="card chart-card">
+                                    <div class="chart-header">
+                                        <h4>Top 5 Setores com Mais Chamados</h4>
+                                        <span class="chart-icon">⚙️</span>
+                                    </div>
+                                    <div id="list-top-equipments" class="equipment-list"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- CONTEÚDO DA ABA EQUIPE -->
+                        <div id="dashboard-tab-equipe" class="dashboard-tab-content" style="display: none;">
+                            <div class="card">
+                                <div class="chart-header">
+                                    <h4>Painel de Carga da Equipe (Status Atual)</h4>
+                                </div>
+                                <div id="team-load-panel" class="team-load-grid">
+                                    <!-- Cards de carga da equipe injetados aqui -->
+                                </div>
+                            </div>
+                            <div class="card" style="margin-top: 1.5rem;">
+                                <div class="chart-header">
+                                    <h4>Tabela de Performance (Período Selecionado)</h4>
+                                </div>
+                                <div style="overflow-x: auto;">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Técnico</th>
+                                                <th>OSs Concluídas</th>
+                                                <th>Tempo Médio de Reparo</th>
+                                                <th>Backlog Planejado</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="team-performance-table">
+                                            <!-- Tabela de performance injetada aqui -->
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -12349,12 +12540,10 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
 
 // --- LÓGICA DO NOVO DASHBOARD DE MANUTENÇÃO ---
 
-        // Função para formatar intervalos de tempo (ex: "2h 30m")
-       // --- LÓGICA DO NOVO DASHBOARD DE MANUTENÇÃO ---
+ // --- LÓGICA DO NOVO DASHBOARD DE MANUTENÇÃO (v3 - BI) ---
 
         function formatInterval(interval) {
-            if (!interval || typeof interval !== 'string') return 'N/A'; // Adicionado verificação de tipo
-            
+            if (!interval || typeof interval !== 'string') return 'N/A';
             const parts = interval.match(/(\d+)\s*days?,?\s*(\d+):(\d+):/);
             if (parts) {
                 const days = parseInt(parts[1], 10);
@@ -12363,7 +12552,6 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
                 if (hours > 0) return `${hours}h ${minutes}m`;
                 return `${minutes}m`;
             }
-            
             const timeParts = interval.split(':');
             if (timeParts.length >= 2) {
                 const hours = parseInt(timeParts[0], 10);
@@ -12380,24 +12568,30 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
         };
 
         function applySectorFilter(setor) {
-            // Se o setor clicado já é o filtro ativo, limpa o filtro
             if (currentDashboardFilters.setor === setor) {
                 currentDashboardFilters.setor = null;
             } else {
                 currentDashboardFilters.setor = setor;
             }
-            loadMaintenanceDashboard(); // Recarrega o dashboard com o novo filtro
+            loadMaintenanceDashboard();
+        }
+
+        function switchDashboardTab(tabId) {
+            document.getElementById('dashboard-tab-geral').style.display = tabId === 'geral' ? 'block' : 'none';
+            document.getElementById('dashboard-tab-equipe').style.display = tabId === 'equipe' ? 'block' : 'none';
+            document.getElementById('tab-btn-geral').classList.toggle('active', tabId === 'geral');
+            document.getElementById('tab-btn-equipe').classList.toggle('active', tabId === 'equipe');
         }
 
         async function loadMaintenanceDashboard() {
             const startDateInput = document.getElementById('dash-start-date');
             const endDateInput = document.getElementById('dash-end-date');
-            const cardsContainer = document.getElementById('dashboard-kpi-cards');
             const topSectorsList = document.getElementById('list-top-equipments');
             const chartCanvas = document.getElementById('chart-os-volume');
 
-            if (!startDateInput || !cardsContainer || !topSectorsList || !chartCanvas) return;
+            if (!startDateInput || !endDateInput) return;
 
+            // Valores Padrão (Últimos 30 Dias)
             if (!startDateInput.value || !endDateInput.value) {
                 const today = new Date();
                 const thirtyDaysAgo = new Date();
@@ -12406,80 +12600,70 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
                 startDateInput.value = thirtyDaysAgo.toISOString().split('T')[0];
             }
             
-            cardsContainer.innerHTML = `<div class="empty-state" style="grid-column: 1 / -1;">Carregando métricas...</div>`;
+            const startDateStr = startDateInput.value;
+            const endDateStr = endDateInput.value;
+
+            // Loading States
+            document.querySelectorAll('#dashboard-tab-geral .stat-card').forEach(el => el.innerHTML = '<div class="empty-state" style="padding:0;">...</div>');
+            document.getElementById('team-load-panel').innerHTML = '<div class="empty-state" style="grid-column: 1/-1;">Carregando equipe...</div>';
             topSectorsList.innerHTML = '';
             
-            const { data, error } = await supabaseClient.rpc('get_maintenance_dashboard_kpis', {
-                start_date: startDateInput.value,
-                end_date: endDateInput.value + 'T23:59:59',
-                p_setor: currentDashboardFilters.setor // Passa o filtro de setor para a RPC
+            // -------------------------------------------------------------
+            // 1. CARREGAR DADOS DO DASHBOARD GERAL (VIA RPC)
+            // -------------------------------------------------------------
+            const { data: kpiData, error } = await supabaseClient.rpc('get_maintenance_dashboard_kpis', {
+                start_date: startDateStr,
+                end_date: endDateStr + 'T23:59:59',
+                p_setor: currentDashboardFilters.setor
             }).single();
-
-            console.log('Dados recebidos do Supabase para o dashboard:', data);
 
             if (error) {
                 console.error("Erro ao carregar KPIs do dashboard:", error);
-                cardsContainer.innerHTML = `<div class="empty-state" style="color:var(--color-danger); grid-column: 1 / -1;">Falha ao carregar métricas.</div>`;
+                showToast("Falha ao carregar métricas gerais.", "danger");
                 return;
             }
+
+            // A. Injetar KPIs de Fluxo e Estoque
+            const formatKpi = (label, value) => `<div class="stat-info"><div class="stat-label">${label}</div><div class="stat-value">${value}</div></div>`;
             
-            // Renderiza os Cards de KPI com a estrutura de hierarquia visual correta
-            cardsContainer.innerHTML = `
-                <div class="card stat-card">
-                    <div class="stat-info">
-                        <p class="stat-value">${data.totalOS || 0}</p>
-                        <h3>OS Abertas</h3>
-                    </div>
-                </div>
-                <div class="card stat-card">
-                    <div class="stat-info">
-                        <p class="stat-value">${(data.pendentes || 0) + (data.planejadas || 0)}</p>
-                        <h3>Pendentes Agora</h3>
-                    </div>
-                </div>
-                <div class="card stat-card card-danger">
-                    <div class="stat-info">
-                        <p class="stat-value">${data.maquinasParadas || 0}</p>
-                        <h3>Máquinas Paradas</h3>
-                    </div>
-                </div>
-                <div class="card stat-card">
-                    <div class="stat-info">
-                        <p class="stat-value">${formatInterval(data.tempoCiclo)}</p>
-                        <h3>Tempo Médio de Ciclo</h3>
-                    </div>
-                </div>
-            `;
+            document.getElementById('kpi-criadas').innerHTML = formatKpi('OS Criadas no Período', kpiData.totalOS || 0);
+            document.getElementById('kpi-pendentes').innerHTML = formatKpi('Pendentes Agora (Backlog)', (kpiData.pendentes || 0) + (kpiData.planejadas || 0));
+            document.getElementById('kpi-resolvidas').innerHTML = formatKpi('Resolvidas no Período', kpiData.resolvidas || 0);
+            document.getElementById('kpi-paradas').innerHTML = formatKpi('Máquinas Paradas', kpiData.maquinasParadas || 0);
 
-            // Adiciona a animação de entrada aos cards
-            document.querySelectorAll('.stat-card').forEach((card, index) => {
-                setTimeout(() => {
-                    card.classList.add('visible');
-                }, index * 100);
-            });
+            // B. Injetar KPIs de Eficiência
+            document.getElementById('kpi-mttp').innerHTML = formatKpi('Tempo Médio p/ Planejar', formatInterval(kpiData.tempoPlanejamento));
+            document.getElementById('kpi-mttr').innerHTML = formatKpi('Tempo Médio de Reparo', formatInterval(kpiData.tempoCiclo));
+            document.getElementById('kpi-aderencia').innerHTML = formatKpi('Aderência ao Prazo', `${kpiData.aderenciaPrazo || 0}%`);
+            document.getElementById('kpi-csat').innerHTML = formatKpi('Satisfação Geral', `${kpiData.satisfacao || 0} <span style="font-size:1rem; color:var(--color-warning);">★</span>`);
 
-            if(data.topSectors && Array.isArray(data.topSectors) && data.topSectors.length > 0) {
-                topSectorsList.innerHTML = data.topSectors.map(item => `
-                    <div onclick="applySectorFilter('${item.setor}')" style="${currentDashboardFilters.setor === item.setor ? 'background-color: var(--color-background); font-weight: 700;' : ''}">
-                        <span>${item.setor}</span>
-                        <span>${item.total} chamados</span>
+            // Animação de entrada
+            document.querySelectorAll('.stat-card').forEach((card, i) => setTimeout(() => card.classList.add('visible'), i * 50));
+
+            // C. Injetar Top Setores (Filtro Interativo)
+            if(kpiData.topSectors && Array.isArray(kpiData.topSectors) && kpiData.topSectors.length > 0) {
+                topSectorsList.innerHTML = kpiData.topSectors.map(item => `
+                    <div onclick="applySectorFilter('${item.setor}')" style="display:flex; justify-content:space-between; padding:0.8rem; border-radius:8px; cursor:pointer; transition:all 0.2s; ${currentDashboardFilters.setor === item.setor ? 'background-color: var(--color-brand-primary); color: white; transform:scale(1.02);' : 'background-color: var(--color-background); margin-bottom:0.5rem;'}">
+                        <span style="font-weight: 600;">${item.setor}</span>
+                        <span style="font-weight: 800;">${item.total}</span>
                     </div>`).join('');
             } else {
-                topSectorsList.innerHTML = `<div class="empty-state" style="padding:1rem 0;">Sem dados de setores no período.</div>`;
+                topSectorsList.innerHTML = `<div class="empty-state">Sem dados no período.</div>`;
             }
 
-            if (chartCanvas && data.dailyVolume && Array.isArray(data.dailyVolume)) {
+            // D. Renderizar Gráfico de Volume
+            if (chartCanvas && kpiData.dailyVolume && Array.isArray(kpiData.dailyVolume)) {
                 const ctx = chartCanvas.getContext('2d');
                 if (window.osVolumeChart) { window.osVolumeChart.destroy(); }
                 
-                const labels = [...new Set(data.dailyVolume.map(d => new Date(d.dia).toLocaleDateString('pt-BR', {timeZone: 'UTC'})))].sort((a,b) => new Date(a.split('/').reverse().join('-')) - new Date(b.split('/').reverse().join('-')));
+                const labels = [...new Set(kpiData.dailyVolume.map(d => new Date(d.dia).toLocaleDateString('pt-BR', {timeZone: 'UTC'})))].sort((a,b) => new Date(a.split('/').reverse().join('-')) - new Date(b.split('/').reverse().join('-')));
+                
                 const datasets = {
-                    'Pendentes': { backgroundColor: 'rgba(245, 158, 11, 0.7)', data: [] },
-                    'Planejadas': { backgroundColor: 'rgba(59, 130, 246, 0.7)', data: [] },
-                    'Executadas': { backgroundColor: 'rgba(16, 185, 129, 0.7)', data: [] }
+                    'Criadas (Abertas no Dia)': { backgroundColor: 'rgba(59, 130, 246, 0.7)', data: [], borderRadius: 4 },
+                    'Executadas (Saída)': { backgroundColor: 'rgba(16, 185, 129, 0.7)', data: [], borderRadius: 4 }
                 };
 
-                const volumeByDate = data.dailyVolume.reduce((acc, curr) => {
+                const volumeByDate = kpiData.dailyVolume.reduce((acc, curr) => {
                     const date = new Date(curr.dia).toLocaleDateString('pt-BR', {timeZone: 'UTC'});
                     if (!acc[date]) acc[date] = {};
                     acc[date][curr.status] = curr.total;
@@ -12488,9 +12672,9 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
 
                 labels.forEach(label => {
                     const dayData = volumeByDate[label] || {};
-                    datasets['Pendentes'].data.push(dayData.pending || dayData.pending_manager_check || 0);
-                    datasets['Planejadas'].data.push(dayData.planned || 0);
-                    datasets['Executadas'].data.push(dayData.executed || 0);
+                    // Mapeamento simplificado para focar na história de Entrada vs Saída
+                    datasets['Criadas (Abertas no Dia)'].data.push(dayData.pending || dayData.pending_manager_check || 0); 
+                    datasets['Executadas (Saída)'].data.push(dayData.executed || 0);
                 });
 
                 window.osVolumeChart = new Chart(ctx, {
@@ -12501,10 +12685,107 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
                     },
                     options: {
                         responsive: true,
-                        scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+                        maintainAspectRatio: false,
+                        scales: { 
+                            x: { grid: { display: false } }, 
+                            y: { beginAtZero: true, border: { dash: [4, 4] } } 
+                        },
                         plugins: { legend: { position: 'top' } }
                     }
                 });
+            }
+
+            // -------------------------------------------------------------
+            // 2. CARREGAR DADOS DA EQUIPE E PERFORMANCE (LADO DO CLIENTE)
+            // -------------------------------------------------------------
+            
+            // Busca Técnicos Ativos
+            const { data: techs } = await supabaseClient.from('maintenance_technicians')
+                .select('id, name, specialty').eq('is_active', true).order('name');
+            
+            // Busca OSs Planejadas e Executadas para extrair métricas operacionais
+            const { data: teamReqs } = await supabaseClient.from('requests')
+                .select('id, status, data, data_planejamento, data_execucao')
+                .eq('type', 'maintenance')
+                .in('status', ['planned', 'executed']);
+
+            if (techs && teamReqs) {
+                const teamLoadPanel = document.getElementById('team-load-panel');
+                const teamPerfTable = document.getElementById('team-performance-table');
+                
+                let loadHtml = '';
+                let tableHtml = '';
+
+                techs.forEach(tech => {
+                    // Filtra OSs atribuídas a este técnico (usando a string do JSON)
+                    const myReqs = teamReqs.filter(r => {
+                        const assignedStr = (r.data && r.data.tecnicos_planejados) ? r.data.tecnicos_planejados : "";
+                        return assignedStr.includes(tech.name);
+                    });
+
+                    // Separa o Backlog (Planned) da Vazão (Executed no período)
+                    const planned = myReqs.filter(r => r.status === 'planned');
+                    const executedInPeriod = myReqs.filter(r => r.status === 'executed' && r.data_execucao >= startDateStr && r.data_execucao <= (endDateStr + 'T23:59:59'));
+
+                    // LÓGICA DO PAINEL DE CARGA (Em Tempo Real)
+                    const isBusy = planned.length > 0;
+                    const currentOS = isBusy ? (planned[0].data?.equipamento || 'Identificando OS...') : 'Pronto para próxima tarefa';
+                    
+                    const statusClass = isBusy ? 'status-busy' : 'status-available';
+                    const statusLabel = isBusy ? 'Em Atendimento' : 'Disponível';
+
+                    loadHtml += `
+                        <div class="technician-load-card">
+                            <div class="technician-header">
+                                <div class="technician-avatar">${tech.name.charAt(0)}</div>
+                                <div>
+                                    <div class="technician-name">${tech.name}</div>
+                                    <div style="font-size: 0.8rem; color: var(--color-text-secondary);">${tech.specialty || 'Técnico'}</div>
+                                </div>
+                            </div>
+                            <div class="technician-status-card ${statusClass}">
+                                <div class="status-title">${statusLabel}</div>
+                                <div class="status-details">${currentOS}</div>
+                            </div>
+                            <div class="technician-backlog-card">
+                                <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--color-text-secondary); font-weight: 700;">Fila de Espera (Backlog)</div>
+                                <div class="backlog-value" style="color: ${planned.length > 3 ? 'var(--color-danger)' : 'var(--color-text-primary)'}">${planned.length} OSs</div>
+                            </div>
+                        </div>
+                    `;
+
+                    // LÓGICA DA TABELA DE PERFORMANCE (Histórico do Período)
+                    let totalRepairTimeMs = 0;
+                    let validExecutions = 0;
+
+                    executedInPeriod.forEach(r => {
+                        if (r.data_planejamento && r.data_execucao) {
+                            const start = new Date(r.data_planejamento).getTime();
+                            const end = new Date(r.data_execucao).getTime();
+                            if (end > start) {
+                                totalRepairTimeMs += (end - start);
+                                validExecutions++;
+                            }
+                        }
+                    });
+
+                    const avgTimeMs = validExecutions > 0 ? (totalRepairTimeMs / validExecutions) : 0;
+                    const avgHours = Math.floor(avgTimeMs / 3600000);
+                    const avgMins = Math.floor((avgTimeMs % 3600000) / 60000);
+                    const avgRepairStr = validExecutions > 0 ? `${avgHours}h ${avgMins}m` : 'N/A';
+
+                    tableHtml += `
+                        <tr>
+                            <td><strong>${tech.name}</strong></td>
+                            <td style="font-weight: 700; color: var(--color-success);">${executedInPeriod.length}</td>
+                            <td>${avgRepairStr}</td>
+                            <td><span class="status-tag ${planned.length > 3 ? 'status-danger' : 'status-planned'}">${planned.length} OSs</span></td>
+                        </tr>
+                    `;
+                });
+
+                teamLoadPanel.innerHTML = loadHtml;
+                teamPerfTable.innerHTML = tableHtml || `<tr><td colspan="4" class="empty-state">Nenhum dado processado para a equipe neste período.</td></tr>`;
             }
         }
 
