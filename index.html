@@ -10,6 +10,11 @@
     <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Flatpickr (Calendário SaaS) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" type="text/css" href="https://npmcdn.com/flatpickr/dist/themes/dark.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/pt.js"></script>
 <script>
 
 let currentSelectionTarget = null;
@@ -2945,17 +2950,13 @@ const appHTML = `<div id="app-container">
                     <!-- NOVO DASHBOARD DE MANUTENÇÃO (VERSÃO FINAL BI) -->
                     <div id="maintenance-tab-dashboard" class="maintenance-tab-content maintenance-dashboard">
     
-                        <!-- SEÇÃO 1: BARRA DE FILTROS (ESTILO SAAS) -->
+                        <!-- SEÇÃO 1: BARRA DE FILTROS (ESTILO SAAS COM FLATPICKR) -->
                         <div class="dashboard-filter-bar">
                             <h3 class="filter-bar-title">Análise de Manutenção</h3>
                             <div class="filter-controls">
-                                <div class="form-group" style="margin-bottom: 0;">
-                                    <select id="dash-period-select" class="input-field" style="height: 38px; min-width: 180px; font-weight: 600; cursor: pointer;" onchange="loadMaintenanceDashboard()">
-                                        <option value="7">Últimos 7 dias</option>
-                                        <option value="30" selected>Últimos 30 dias</option>
-                                        <option value="mes_atual">Este Mês (Desde o dia 1)</option>
-                                        <option value="mes_passado">Mês Passado</option>
-                                    </select>
+                                <div class="form-group" style="margin-bottom: 0; position: relative;">
+                                    <input type="text" id="dash-date-range" class="input-field" placeholder="Selecione o período..." style="height: 38px; min-width: 230px; font-weight: 600; cursor: pointer; padding-left: 36px; background-color: var(--color-background);">
+                                    <span class="material-icons" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--color-brand-primary); font-size: 18px; pointer-events: none;">date_range</span>
                                 </div>
                             </div>
                         </div>
@@ -12590,32 +12591,40 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
         }
 
         async function loadMaintenanceDashboard() {
-            const periodSelect = document.getElementById('dash-period-select');
+            const dateInput = document.getElementById('dash-date-range');
             const topSectorsList = document.getElementById('list-top-equipments');
             const chartCanvas = document.getElementById('chart-os-volume');
 
-            if (!periodSelect) return;
+            if (!dateInput) return;
 
-            // 1. CÁLCULO INTELIGENTE DE DATAS BASEADO NO DROPDOWN
-            const today = new Date();
-            let startDate = new Date();
-            let endDate = new Date();
+            // Inicializa o calendário profissional (Flatpickr) se for a primeira vez
+            if (!window.dashCalendarInstance) {
+                const today = new Date();
+                const thirtyDaysAgo = new Date(today);
+                thirtyDaysAgo.setDate(today.getDate() - 30);
 
-            switch (periodSelect.value) {
-                case '7':
-                    startDate.setDate(today.getDate() - 7);
-                    break;
-                case '30':
-                    startDate.setDate(today.getDate() - 30);
-                    break;
-                case 'mes_atual':
-                    startDate = new Date(today.getFullYear(), today.getMonth(), 1);
-                    break;
-                case 'mes_passado':
-                    startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-                    endDate = new Date(today.getFullYear(), today.getMonth(), 0); // Último dia do mês passado
-                    break;
+                window.dashCalendarInstance = flatpickr(dateInput, {
+                    mode: "range",
+                    dateFormat: "Y-m-d",
+                    altInput: true,
+                    altFormat: "d M, Y",
+                    locale: "pt",
+                    defaultDate: [thirtyDaysAgo, today],
+                    onChange: function(selectedDates) {
+                        // Só atualiza o dashboard quando o usuário selecionar as DUAS datas (início e fim)
+                        if (selectedDates.length === 2) {
+                            loadMaintenanceDashboard();
+                        }
+                    }
+                });
             }
+
+            // Pega as datas selecionadas no calendário
+            const selectedDates = window.dashCalendarInstance.selectedDates;
+            if (selectedDates.length !== 2) return;
+
+            const startDate = selectedDates[0];
+            const endDate = selectedDates[1];
 
             const startDateStr = formatLocalDate(startDate);
             const endDateStr = formatLocalDate(endDate);
