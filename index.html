@@ -2980,7 +2980,6 @@ const appHTML = `<div id="app-container">
                                 <!-- Linha de KPIs de Eficiência -->
                                 <div class="stat-card" id="kpi-mttp"></div>
                                 <div class="stat-card" id="kpi-mttr"></div>
-                                <div class="stat-card" id="kpi-aderencia"></div>
                                 <div class="stat-card" id="kpi-csat"></div>
                             </div>
                             <div class="dashboard-divider"></div>
@@ -12635,7 +12634,6 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
             // B. Injetar KPIs de Eficiência (REMOVIDO O formatInterval)
             document.getElementById('kpi-mttp').innerHTML = formatKpi('Tempo Médio p/ Planejar', kpiData.tempoPlanejamento || '0h 0m');
             document.getElementById('kpi-mttr').innerHTML = formatKpi('Tempo Médio de Reparo', kpiData.tempoCiclo || '0h 0m');
-            document.getElementById('kpi-aderencia').innerHTML = formatKpi('Aderência ao Prazo', `${kpiData.aderenciaPrazo || 0}%`);
             document.getElementById('kpi-csat').innerHTML = formatKpi('Satisfação Geral', `${kpiData.satisfacao || 0} <span style="font-size:1rem; color:var(--color-warning);">★</span>`);
 
             // Animação de entrada
