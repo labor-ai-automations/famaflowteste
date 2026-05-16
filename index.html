@@ -2945,21 +2945,18 @@ const appHTML = `<div id="app-container">
                     <!-- INÍCIO DO NOVO DASHBOARD DE MANUTENÇÃO (REATORADO) -->
                     <div id="maintenance-tab-dashboard" class="maintenance-tab-content maintenance-dashboard">
     
-                        <!-- SEÇÃO 1: BARRA DE FILTROS (COMPACTA) -->
+                        <!-- SEÇÃO 1: BARRA DE FILTROS (ESTILO SAAS) -->
                         <div class="dashboard-filter-bar">
                             <h3 class="filter-bar-title">Análise de Manutenção</h3>
                             <div class="filter-controls">
-                                <div class="form-group">
-                                    <label for="dash-start-date">Data Início</label>
-                                    <input type="date" id="dash-start-date">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <select id="dash-period-select" class="input-field" style="height: 38px; min-width: 180px; font-weight: 600; cursor: pointer;" onchange="loadMaintenanceDashboard()">
+                                        <option value="7">Últimos 7 dias</option>
+                                        <option value="30" selected>Últimos 30 dias</option>
+                                        <option value="mes_atual">Este Mês (Desde o dia 1)</option>
+                                        <option value="mes_passado">Mês Passado</option>
+                                    </select>
                                 </div>
-                                <div class="form-group">
-                                    <label for="dash-end-date">Data Fim</label>
-                                    <input type="date" id="dash-end-date">
-                                </div>
-                                <button id="btn-apply-dash-filters" class="btn btn-danger btn-apply-filters">
-                                    <span>Aplicar</span>
-                                </button>
                             </div>
                         </div>
 
@@ -2973,14 +2970,15 @@ const appHTML = `<div id="app-container">
                         <div id="dashboard-tab-geral" class="dashboard-tab-content">
                              <div class="kpi-grid" style="grid-template-rows: 1fr 1fr; gap: 1.25rem;">
                                 <!-- Linha de KPIs de Fluxo -->
-                                <div class="stat-card" id="kpi-criadas"></div>
-                                <div class="stat-card" id="kpi-pendentes"></div>
-                                <div class="stat-card" id="kpi-resolvidas"></div>
-                                <div class="stat-card stat-card--danger" id="kpi-paradas"></div>
+                                <div class="stat-card" id="kpi-criadas" style="display: flex; flex-direction: column; align-items: flex-start; gap: 6px;"></div>
+                                <div class="stat-card" id="kpi-pendentes" style="display: flex; flex-direction: column; align-items: flex-start; gap: 6px;"></div>
+                                <div class="stat-card" id="kpi-resolvidas" style="display: flex; flex-direction: column; align-items: flex-start; gap: 6px;"></div>
+                                <div class="stat-card stat-card--danger" id="kpi-paradas" style="display: flex; flex-direction: column; align-items: flex-start; gap: 6px; border-color: rgba(216,25,32,0.2); background-color: var(--color-danger-bg);"></div>
+                                
                                 <!-- Linha de KPIs de Eficiência -->
-                                <div class="stat-card" id="kpi-mttp"></div>
-                                <div class="stat-card" id="kpi-mttr"></div>
-                                <div class="stat-card" id="kpi-csat"></div>
+                                <div class="stat-card" id="kpi-mttp" style="display: flex; flex-direction: column; align-items: flex-start; gap: 6px;"></div>
+                                <div class="stat-card" id="kpi-mttr" style="display: flex; flex-direction: column; align-items: flex-start; gap: 6px;"></div>
+                                <div class="stat-card" id="kpi-csat" style="display: flex; flex-direction: column; align-items: flex-start; gap: 6px; grid-column: span 2;"></div>
                             </div>
                             <div class="dashboard-divider"></div>
                             <div class="charts-grid">
@@ -12538,30 +12536,9 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
     }
 }
 
-// --- LÓGICA DO NOVO DASHBOARD DE MANUTENÇÃO ---
-
- // --- LÓGICA DO NOVO DASHBOARD DE MANUTENÇÃO (v3 - BI) ---
-
-        function formatInterval(interval) {
-            if (!interval || typeof interval !== 'string') return 'N/A';
-            const parts = interval.match(/(\d+)\s*days?,?\s*(\d+):(\d+):/);
-            if (parts) {
-                const days = parseInt(parts[1], 10);
-                const hours = parseInt(parts[2], 10) + (days * 24);
-                const minutes = parseInt(parts[3], 10);
-                if (hours > 0) return `${hours}h ${minutes}m`;
-                return `${minutes}m`;
-            }
-            const timeParts = interval.split(':');
-            if (timeParts.length >= 2) {
-                const hours = parseInt(timeParts[0], 10);
-                const minutes = parseInt(timeParts[1], 10);
-                if (isNaN(hours) || isNaN(minutes)) return 'N/A';
-                if (hours > 0) return `${hours}h ${minutes}m`;
-                return `${minutes}m`;
-            }
-            return 'N/A';
-        }
+// ==============================================================
+        // --- LÓGICA DO DASHBOARD DE MANUTENÇÃO (VERSÃO FINAL BI) ---
+        // ==============================================================
 
         let currentDashboardFilters = {
             setor: null
@@ -12569,7 +12546,7 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
 
         function applySectorFilter(setor) {
             if (currentDashboardFilters.setor === setor) {
-                currentDashboardFilters.setor = null;
+                currentDashboardFilters.setor = null; // Limpa o filtro se clicar no mesmo
             } else {
                 currentDashboardFilters.setor = setor;
             }
@@ -12583,87 +12560,175 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
             document.getElementById('tab-btn-equipe').classList.toggle('active', tabId === 'equipe');
         }
 
+        // Função utilitária para formatar as datas (YYYY-MM-DD) usando timezone local
+        const formatLocalDate = (dateObj) => {
+            return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+        };
+
+        // Função utilitária para gerar a setinha de tendência
+        function getTrendHtml(atual, anterior, reverseColors = false) {
+            if (anterior === 0 && atual === 0) return `<span style="color:var(--color-text-secondary); font-weight:700;">= 0%</span>`;
+            if (anterior === 0) return `<span style="color:${reverseColors ? 'var(--color-danger)' : 'var(--color-success)'}; font-weight:700;">🡑 +100%</span>`;
+            
+            const diff = atual - anterior;
+            const pct = Math.round((Math.abs(diff) / anterior) * 100);
+            
+            if (diff > 0) return `<span style="color:${reverseColors ? 'var(--color-danger)' : 'var(--color-success)'}; font-weight:700;">🡑 +${pct}%</span>`;
+            if (diff < 0) return `<span style="color:${reverseColors ? 'var(--color-success)' : 'var(--color-danger)'}; font-weight:700;">🔻 -${pct}%</span>`;
+            
+            return `<span style="color:var(--color-text-secondary); font-weight:700;">= 0%</span>`;
+        }
+
+        // Função utilitária para montar os "Cards Ricos"
+        function buildRichCardHtml(title, mainValue, trendHtml, contextHtml) {
+            return `
+                <div class="stat-label" style="margin-bottom:0;">${title}</div>
+                <div class="stat-value" style="margin-bottom:4px;">${mainValue}</div>
+                <div style="font-size: 0.75rem; color: var(--color-text-secondary); display:flex; flex-direction:column; gap:2px; font-weight: 500;">
+                    ${trendHtml ? `<div>${trendHtml} <span style="opacity:0.7;">vs. período anterior</span></div>` : ''}
+                    ${contextHtml ? `<div>${contextHtml}</div>` : ''}
+                </div>
+            `;
+        }
+
         async function loadMaintenanceDashboard() {
-            const startDateInput = document.getElementById('dash-start-date');
-            const endDateInput = document.getElementById('dash-end-date');
+            const periodSelect = document.getElementById('dash-period-select');
             const topSectorsList = document.getElementById('list-top-equipments');
             const chartCanvas = document.getElementById('chart-os-volume');
 
-            if (!startDateInput || !endDateInput) return;
+            if (!periodSelect) return;
 
-            // Valores Padrão (Últimos 30 Dias)
-            if (!startDateInput.value || !endDateInput.value) {
-                const today = new Date();
-                const thirtyDaysAgo = new Date();
-                thirtyDaysAgo.setDate(today.getDate() - 30);
-                endDateInput.value = today.toISOString().split('T')[0];
-                startDateInput.value = thirtyDaysAgo.toISOString().split('T')[0];
+            // 1. CÁLCULO INTELIGENTE DE DATAS BASEADO NO DROPDOWN
+            const today = new Date();
+            let startDate = new Date();
+            let endDate = new Date();
+
+            switch (periodSelect.value) {
+                case '7':
+                    startDate.setDate(today.getDate() - 7);
+                    break;
+                case '30':
+                    startDate.setDate(today.getDate() - 30);
+                    break;
+                case 'mes_atual':
+                    startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+                    break;
+                case 'mes_passado':
+                    startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                    endDate = new Date(today.getFullYear(), today.getMonth(), 0); // Último dia do mês passado
+                    break;
             }
-            
-            const startDateStr = startDateInput.value;
-            const endDateStr = endDateInput.value;
 
-            // Loading States
-            document.querySelectorAll('#dashboard-tab-geral .stat-card').forEach(el => el.innerHTML = '<div class="empty-state" style="padding:0;">...</div>');
+            const startDateStr = formatLocalDate(startDate);
+            const endDateStr = formatLocalDate(endDate);
+            
+            // Para calcular médias diárias
+            const diffTime = Math.abs(endDate - startDate);
+            const diasPeriodo = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
+
+            // Limpa as áreas (Loading State)
+            document.querySelectorAll('#dashboard-tab-geral .stat-card').forEach(el => el.innerHTML = '<div class="empty-state" style="padding:0;">Carregando...</div>');
             document.getElementById('team-load-panel').innerHTML = '<div class="empty-state" style="grid-column: 1/-1;">Carregando equipe...</div>';
             topSectorsList.innerHTML = '';
             
             // -------------------------------------------------------------
-            // 1. CARREGAR DADOS DO DASHBOARD GERAL (VIA RPC)
+            // 2. BUSCA DO JSON COMPLETO NO SUPABASE
             // -------------------------------------------------------------
             const { data: kpiData, error } = await supabaseClient.rpc('get_maintenance_dashboard_kpis', {
                 start_date: startDateStr,
-                end_date: endDateStr, // Enviando apenas a data 'YYYY-MM-DD' conforme o SQL espera
+                end_date: endDateStr,
                 p_setor: currentDashboardFilters.setor
             }).single();
 
-            if (error) {
-                console.error("Erro ao carregar KPIs do dashboard:", error);
-                showToast("Falha ao carregar métricas gerais.", "danger");
+            if (error || !kpiData) {
+                console.error("Erro ao carregar KPIs:", error);
+                showToast("Falha ao carregar métricas.", "danger");
                 return;
             }
 
-            // A. Injetar KPIs de Fluxo e Estoque
-            const formatKpi = (label, value) => `<div class="stat-info"><div class="stat-label">${label}</div><div class="stat-value">${value}</div></div>`;
+            // -------------------------------------------------------------
+            // 3. INJEÇÃO DOS DADOS NOS CARDS RICOS (ABA GERAL)
+            // -------------------------------------------------------------
             
-            document.getElementById('kpi-criadas').innerHTML = formatKpi('OS Criadas no Período', kpiData.totalOS || 0);
-            document.getElementById('kpi-pendentes').innerHTML = formatKpi('Pendentes Agora (Backlog)', (kpiData.pendentes || 0) + (kpiData.planejadas || 0));
-            document.getElementById('kpi-resolvidas').innerHTML = formatKpi('Resolvidas no Período', kpiData.resolvidas || 0);
-            document.getElementById('kpi-paradas').innerHTML = formatKpi('Máquinas Paradas', kpiData.maquinasParadas || 0);
+            // OS CRIADAS
+            const mediaDia = (kpiData.criadas.atual / diasPeriodo).toFixed(1);
+            document.getElementById('kpi-criadas').innerHTML = buildRichCardHtml(
+                'OS Criadas no Período', 
+                kpiData.criadas.atual, 
+                getTrendHtml(kpiData.criadas.atual, kpiData.criadas.anterior, true), // reverseColors=true (Aumento de OS é "ruim/vermelho")
+                `↳ Média de ${mediaDia} por dia`
+            );
 
-            // B. Injetar KPIs de Eficiência (REMOVIDO O formatInterval)
-            document.getElementById('kpi-mttp').innerHTML = formatKpi('Tempo Médio p/ Planejar', kpiData.tempoPlanejamento || '0h 0m');
-            document.getElementById('kpi-mttr').innerHTML = formatKpi('Tempo Médio de Reparo', kpiData.tempoCiclo || '0h 0m');
-            document.getElementById('kpi-csat').innerHTML = formatKpi('Satisfação Geral', `${kpiData.satisfacao || 0} <span style="font-size:1rem; color:var(--color-warning);">★</span>`);
+            // PENDENTES AGORA
+            let contextoPendentes = kpiData.pendentes.velhas > 0 
+                ? `<span style="color:var(--color-warning);">⚠️ ${kpiData.pendentes.velhas} OSs paradas há > 5 dias</span>` 
+                : `↳ Fila sob controle (Max: ${kpiData.pendentes.max_dias} dias)`;
+            
+            document.getElementById('kpi-pendentes').innerHTML = buildRichCardHtml(
+                'Pendentes Agora (Backlog)', 
+                kpiData.pendentes.atual, 
+                null, // Não tem tendência para backlog atual vs passado fixo
+                contextoPendentes
+            );
 
-            // Animação de entrada
-            document.querySelectorAll('.stat-card').forEach((card, i) => setTimeout(() => card.classList.add('visible'), i * 50));
+            // RESOLVIDAS
+            const taxaVazao = kpiData.criadas.atual > 0 ? Math.round((kpiData.resolvidas.atual / kpiData.criadas.atual) * 100) : 100;
+            document.getElementById('kpi-resolvidas').innerHTML = buildRichCardHtml(
+                'Resolvidas no Período', 
+                kpiData.resolvidas.atual, 
+                getTrendHtml(kpiData.resolvidas.atual, kpiData.resolvidas.anterior, false), // Aumento de resolvidas é "bom/verde"
+                `↳ Taxa de Resolução: <strong style="color:${taxaVazao < 100 ? 'var(--color-danger)' : 'var(--color-success)'}">${taxaVazao}%</strong>`
+            );
 
-            // C. Injetar Top Setores (Filtro Interativo)
-            if(kpiData.topSectors && Array.isArray(kpiData.topSectors) && kpiData.topSectors.length > 0) {
-                topSectorsList.innerHTML = kpiData.topSectors.map(item => `
+            // MÁQUINAS PARADAS
+            document.getElementById('kpi-paradas').innerHTML = buildRichCardHtml(
+                'Máquinas Paradas', 
+                kpiData.paradas.atual, 
+                null, 
+                kpiData.paradas.atual > 0 ? `⚠️ Parada mais longa: ${kpiData.paradas.max_horas}h` : `<span style="color:var(--color-success);">Tudo operando</span>`
+            );
+
+            // TEMPO PARA PLANEJAR E TEMPO DE REPARO
+            const mttpTrend = kpiData.mttp.anterior !== 'N/A' ? `Anteriormente: ${kpiData.mttp.anterior}` : '';
+            document.getElementById('kpi-mttp').innerHTML = buildRichCardHtml('Tempo Médio p/ Planejar', kpiData.mttp.atual, null, mttpTrend ? `↳ ${mttpTrend}` : '');
+
+            const mttrTrend = kpiData.mttr.anterior !== 'N/A' ? `Anteriormente: ${kpiData.mttr.anterior}` : '';
+            document.getElementById('kpi-mttr').innerHTML = buildRichCardHtml('Tempo Médio de Reparo', kpiData.mttr.atual, null, mttrTrend ? `↳ ${mttrTrend}` : '');
+
+            // SATISFAÇÃO (CSAT)
+            document.getElementById('kpi-csat').innerHTML = buildRichCardHtml(
+                'Satisfação Geral', 
+                `${kpiData.csat.media} <span style="font-size:1.6rem; color:var(--color-warning); position:relative; top:2px;">★</span>`, 
+                null, 
+                `↳ Baseado em ${kpiData.csat.qtd} avaliações`
+            );
+
+            // -------------------------------------------------------------
+            // 4. TOP SETORES & GRÁFICO DE BARRAS
+            // -------------------------------------------------------------
+            if(kpiData.top_sectors && kpiData.top_sectors.length > 0) {
+                topSectorsList.innerHTML = kpiData.top_sectors.map(item => `
                     <div onclick="applySectorFilter('${item.setor}')" style="display:flex; justify-content:space-between; padding:0.8rem; border-radius:8px; cursor:pointer; transition:all 0.2s; ${currentDashboardFilters.setor === item.setor ? 'background-color: var(--color-brand-primary); color: white; transform:scale(1.02);' : 'background-color: var(--color-background); margin-bottom:0.5rem;'}">
-                        <span style="font-weight: 600;">${item.setor}</span>
+                        <span style="font-weight: 600; text-transform: capitalize;">${item.setor}</span>
                         <span style="font-weight: 800;">${item.total}</span>
                     </div>`).join('');
             } else {
                 topSectorsList.innerHTML = `<div class="empty-state">Sem dados no período.</div>`;
             }
 
-            // D. Renderizar Gráfico de Volume
-            if (chartCanvas && kpiData.dailyVolume && Array.isArray(kpiData.dailyVolume)) {
+            if (chartCanvas && kpiData.daily_volume) {
                 const ctx = chartCanvas.getContext('2d');
                 if (window.osVolumeChart) { window.osVolumeChart.destroy(); }
                 
-                const labels = [...new Set(kpiData.dailyVolume.map(d => new Date(d.dia).toLocaleDateString('pt-BR', {timeZone: 'UTC'})))].sort((a,b) => new Date(a.split('/').reverse().join('-')) - new Date(b.split('/').reverse().join('-')));
+                const labels = [...new Set(kpiData.daily_volume.map(d => new Date(d.dia + 'T12:00:00').toLocaleDateString('pt-BR')))].sort((a,b) => new Date(a.split('/').reverse().join('-')) - new Date(b.split('/').reverse().join('-')));
                 
                 const datasets = {
                     'Criadas (Abertas no Dia)': { backgroundColor: 'rgba(59, 130, 246, 0.7)', data: [], borderRadius: 4 },
                     'Executadas (Saída)': { backgroundColor: 'rgba(16, 185, 129, 0.7)', data: [], borderRadius: 4 }
                 };
 
-                const volumeByDate = kpiData.dailyVolume.reduce((acc, curr) => {
-                    const date = new Date(curr.dia).toLocaleDateString('pt-BR', {timeZone: 'UTC'});
+                const volumeByDate = kpiData.daily_volume.reduce((acc, curr) => {
+                    const date = new Date(curr.dia + 'T12:00:00').toLocaleDateString('pt-BR');
                     if (!acc[date]) acc[date] = {};
                     acc[date][curr.status] = curr.total;
                     return acc;
@@ -12677,55 +12742,39 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
 
                 window.osVolumeChart = new Chart(ctx, {
                     type: 'bar',
-                    data: {
-                        labels: labels,
-                        datasets: Object.keys(datasets).map(key => ({ label: key, ...datasets[key] }))
-                    },
+                    data: { labels: labels, datasets: Object.keys(datasets).map(key => ({ label: key, ...datasets[key] })) },
                     options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: { 
-                            x: { grid: { display: false } }, 
-                            y: { beginAtZero: true, border: { dash: [4, 4] } } 
-                        },
+                        responsive: true, maintainAspectRatio: false,
+                        scales: { x: { grid: { display: false } }, y: { beginAtZero: true, border: { dash: [4, 4] } } },
                         plugins: { legend: { position: 'top' } }
                     }
                 });
             }
 
             // -------------------------------------------------------------
-            // 2. CARREGAR DADOS DA EQUIPE E PERFORMANCE (LADO DO CLIENTE)
+            // 5. ABA: ANÁLISE DA EQUIPE (Carga Atual e Histórica)
             // -------------------------------------------------------------
-            
-            // Busca Técnicos Ativos
-            const { data: techs } = await supabaseClient.from('maintenance_technicians')
-                .select('id, name, specialty').eq('is_active', true).order('name');
-            
-            // CORREÇÃO AQUI: Em vez de fazer uma nova busca errada no banco, aproveitamos os dados da página
+            const { data: techs } = await supabaseClient.from('maintenance_technicians').select('id, name, specialty').eq('is_active', true).order('name');
             const teamReqs = allMaintenanceRequestsCache || [];
 
             if (techs && teamReqs) {
                 const teamLoadPanel = document.getElementById('team-load-panel');
                 const teamPerfTable = document.getElementById('team-performance-table');
-                
-                let loadHtml = '';
-                let tableHtml = '';
+                let loadHtml = ''; let tableHtml = '';
 
                 techs.forEach(tech => {
-                    // Filtra OSs atribuídas a este técnico
+                    // Filtra OSs do técnico atual
                     const myReqs = teamReqs.filter(r => {
                         const assignedStr = (r.data && r.data.tecnicos_planejados) ? r.data.tecnicos_planejados : "";
                         return assignedStr.includes(tech.name);
                     });
 
-                    // Separa o Backlog (Planned) da Vazão (Executed)
                     const planned = myReqs.filter(r => r.status === 'planned');
                     const executedInPeriod = myReqs.filter(r => r.status === 'executed');
 
-                    // LÓGICA DO PAINEL DE CARGA (Em Tempo Real)
+                    // Painel de Carga
                     const isBusy = planned.length > 0;
-                    const currentOS = isBusy ? (planned[0].data?.equipamento || 'Equipamento não listado') : 'Pronto para próxima tarefa';
-                    
+                    const currentOS = isBusy ? (planned[0].data?.equipamento || 'Equipamento...') : 'Pronto para próxima OS';
                     const statusClass = isBusy ? 'status-busy' : 'status-available';
                     const statusLabel = isBusy ? 'Em Atendimento' : 'Disponível';
 
@@ -12733,34 +12782,36 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
                         <div class="technician-load-card">
                             <div class="technician-header">
                                 <div class="technician-avatar">${tech.name.charAt(0)}</div>
-                                <div>
-                                    <div class="technician-name">${tech.name}</div>
-                                    <div style="font-size: 0.8rem; color: var(--color-text-secondary);">${tech.specialty || 'Técnico'}</div>
-                                </div>
+                                <div><div class="technician-name">${tech.name}</div><div style="font-size: 0.8rem; color: var(--color-text-secondary);">${tech.specialty || 'Técnico'}</div></div>
                             </div>
-                            <div class="technician-status-card ${statusClass}">
-                                <div class="status-title">${statusLabel}</div>
-                                <div class="status-details">${currentOS}</div>
-                            </div>
+                            <div class="technician-status-card ${statusClass}"><div class="status-title">${statusLabel}</div><div class="status-details">${currentOS}</div></div>
                             <div class="technician-backlog-card">
-                                <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--color-text-secondary); font-weight: 700;">Fila de Espera (Backlog)</div>
+                                <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--color-text-secondary); font-weight: 700;">Fila de Espera</div>
                                 <div class="backlog-value" style="color: ${planned.length > 3 ? 'var(--color-danger)' : 'var(--color-text-primary)'}">${planned.length} OSs</div>
                             </div>
-                        </div>
-                    `;
+                        </div>`;
+
+                    // Tabela de Performance
+                    let totalRepairTimeMs = 0; let validExecutions = 0;
+                    executedInPeriod.forEach(r => {
+                        if (r.data_planejamento && r.data_execucao) {
+                            const start = new Date(r.data_planejamento).getTime(); const end = new Date(r.data_execucao).getTime();
+                            if (end > start) { totalRepairTimeMs += (end - start); validExecutions++; }
+                        }
+                    });
+                    const avgTimeMs = validExecutions > 0 ? (totalRepairTimeMs / validExecutions) : 0;
+                    const avgRepairStr = validExecutions > 0 ? `${Math.floor(avgTimeMs / 3600000)}h ${Math.floor((avgTimeMs % 3600000) / 60000)}m` : 'N/A';
 
                     tableHtml += `
                         <tr>
                             <td><strong>${tech.name}</strong></td>
                             <td style="font-weight: 700; color: var(--color-success);">${executedInPeriod.length}</td>
-                            <td><span style="font-size: 0.8rem; color: var(--color-text-secondary);">Métrica em desenvolvimento</span></td>
+                            <td>${avgRepairStr}</td>
                             <td><span class="status-tag ${planned.length > 3 ? 'status-danger' : 'status-planned'}">${planned.length} OSs</span></td>
-                        </tr>
-                    `;
+                        </tr>`;
                 });
-
                 teamLoadPanel.innerHTML = loadHtml;
-                teamPerfTable.innerHTML = tableHtml || `<tr><td colspan="4" class="empty-state">Nenhum dado processado para a equipe neste período.</td></tr>`;
+                teamPerfTable.innerHTML = tableHtml || `<tr><td colspan="4" class="empty-state">Sem dados processados.</td></tr>`;
             }
         }
 
