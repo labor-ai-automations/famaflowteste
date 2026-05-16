@@ -1482,50 +1482,100 @@ body.fullscreen-flow .flowchart-monitor-bar {
 }
 
 /* ========================================
-   CSS DO DASHBOARD DE MANUTENÇÃO
+   CSS DO DASHBOARD DE MANUTENÇÃO (v2 - PRO)
    ======================================== */
-.maintenance-dashboard { display: flex; flex-direction: column; gap: 1.5rem; }
-.dashboard-filter-bar { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; padding: 1rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; flex-wrap: wrap; }
-.filter-bar-title { margin: 0; font-size: 1.1rem; font-weight: 600; color: var(--color-text-primary); }
-.filter-controls { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
-.filter-controls .form-group { margin: 0; }
-.filter-controls .form-group label { font-size: 0.75rem; font-weight: 600; color: var(--color-text-secondary); }
-.filter-controls input[type="date"] { padding: 0.5rem 0.75rem; background: var(--color-background); color: var(--color-text-primary); border-radius: 8px; border: 1px solid var(--color-border); }
-.btn-apply-filters { align-self: flex-end; }
-.kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; width: 100%; }
-.dashboard-divider { height: 1px; background: var(--color-border); margin: 0.5rem 0; }
-.charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; width: 100%; }
-.chart-card { display: flex; flex-direction: column; gap: 1rem; }
-.chart-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--color-border); padding-bottom: 0.75rem; margin-bottom: 0.5rem; }
-.chart-header h4 { margin: 0; font-size: 1rem; font-weight: 600; color: var(--color-text-primary); }
-.chart-icon { font-size: 1.25rem; }
-#chart-os-volume { max-height: 280px; }
-.equipment-list { display: flex; flex-direction: column; gap: 0.75rem; }
-.equipment-list div { font-size: 0.9rem; }
-.stat-card .stat-value { font-size: 2.5rem; font-weight: 700; line-height: 1; }
-.stat-card .stat-label { font-size: 0.8rem; font-weight: 600; color: var(--color-text-secondary); margin-top: 0.5rem; }
-.stat-card--danger .stat-value { color: var(--color-danger); }
-@media (max-width: 1200px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 768px) { .charts-grid { grid-template-columns: 1fr; } .dashboard-filter-bar { flex-direction: column; align-items: stretch; } }
-
-/* NOVOS ESTILOS PARA INTERATIVIDADE */
-.kpi-grid .stat-card {
-    transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+.maintenance-dashboard { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 1.5rem; 
 }
-.kpi-grid .stat-card:hover {
+
+/* --- Barra de Filtros (Compacta e Profissional) --- */
+.dashboard-filter-bar { 
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between; 
+    gap: 1.5rem; 
+    padding: 0.75rem 1rem; 
+    background: var(--color-surface); 
+    border: 1px solid var(--color-border); 
+    border-radius: 12px; 
+    flex-wrap: wrap; 
+    box-shadow: var(--shadow);
+}
+.filter-bar-title { 
+    margin: 0; 
+    font-size: 1.1rem; 
+    font-weight: 600; 
+    color: var(--color-text-primary); 
+}
+.filter-controls { 
+    display: flex; 
+    align-items: flex-end; 
+    gap: 1rem; 
+    flex-wrap: wrap; 
+}
+.filter-controls .form-group { 
+    margin: 0; 
+}
+.filter-controls .form-group label { 
+    font-size: 0.75rem; 
+    font-weight: 600; 
+    color: var(--color-text-secondary);
+    margin-bottom: 0.25rem;
+    display: block;
+}
+.filter-controls input[type="date"] { 
+    padding: 0.5rem 0.75rem; 
+    background: var(--color-background); 
+    color: var(--color-text-primary); 
+    border-radius: 8px; 
+    border: 1px solid var(--color-border);
+    height: 38px;
+}
+.btn-apply-filters { 
+    align-self: flex-end;
+    height: 38px;
+}
+
+/* --- Grade de KPIs --- */
+.kpi-grid { 
+    display: grid; 
+    grid-template-columns: repeat(4, 1fr); 
+    gap: 1.5rem; 
+    width: 100%; 
+}
+.stat-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    padding: 1rem 1.5rem;
+    border-radius: 12px;
+    box-shadow: none;
+    transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+.stat-card:hover {
     transform: translateY(-5px);
     box-shadow: var(--shadow);
 }
-#list-top-equipments > div {
-    cursor: pointer;
-    transition: background-color 0.2s ease-out;
-    border-radius: 6px;
-    margin: 0 -0.5rem;
-    padding: 0.5rem;
+.stat-card .stat-value { 
+    font-size: 2.25rem; 
+    font-weight: 800; 
+    line-height: 1;
+    color: var(--color-text-primary);
 }
-#list-top-equipments > div:hover {
-    background-color: var(--color-background);
+.stat-card .stat-label { 
+    font-size: 0.8rem; 
+    font-weight: 600; 
+    color: var(--color-text-secondary); 
+    margin-top: 0.25rem;
 }
+.stat-card--danger .stat-value { 
+    color: var(--color-danger); 
+}
+/* Animação de entrada */
 .stat-card {
     opacity: 0;
     transform: translateY(20px);
@@ -1535,8 +1585,70 @@ body.fullscreen-flow .flowchart-monitor-bar {
     opacity: 1;
     transform: translateY(0);
 }
-#chart-os-volume {
+
+/* --- Grade dos Gráficos --- */
+.dashboard-divider { 
+    height: 1px; 
+    background: var(--color-border); 
+    margin: 0.5rem 0; 
+}
+.charts-grid { 
+    display: grid; 
+    grid-template-columns: 2fr 1fr; /* Gráfico maior que a lista */
+    gap: 1.5rem; 
+    width: 100%; 
+}
+.chart-card { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 1rem; 
+    padding: 1.5rem; /* Padding interno do card */
+}
+.chart-header { 
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between;
+}
+.chart-header h4 { 
+    margin: 0; 
+    font-size: 1rem; 
+    font-weight: 700; 
+    color: var(--color-text-primary); 
+}
+.chart-icon { 
+    font-size: 1.25rem;
+    color: var(--color-text-secondary);
+}
+#chart-os-volume { 
+    max-height: 280px; 
     cursor: pointer;
+}
+.equipment-list { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 0.25rem;
+}
+.equipment-list > div {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9rem;
+    padding: 0.6rem 0.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s ease-out;
+}
+.equipment-list > div:hover {
+    background-color: var(--color-background);
+}
+
+/* --- Responsividade --- */
+@media (max-width: 1200px) { 
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); } 
+    .charts-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) { 
+    .dashboard-filter-bar { flex-direction: column; align-items: stretch; } 
+    .kpi-grid { grid-template-columns: 1fr; }
 }
 
 
@@ -12311,22 +12423,31 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
                 return;
             }
             
+            // Renderiza os Cards de KPI com a estrutura de hierarquia visual correta
             cardsContainer.innerHTML = `
                 <div class="card stat-card">
-                    <div class="stat-value">${data.totalOS || 0}</div>
-                    <div class="stat-label">OS Abertas</div>
+                    <div class="stat-info">
+                        <p class="stat-value">${data.totalOS || 0}</p>
+                        <h3>OS Abertas</h3>
+                    </div>
                 </div>
                 <div class="card stat-card">
-                    <div class="stat-value">${(data.pendentes || 0) + (data.planejadas || 0)}</div>
-                    <div class="stat-label">Pendentes Agora</div>
+                    <div class="stat-info">
+                        <p class="stat-value">${(data.pendentes || 0) + (data.planejadas || 0)}</p>
+                        <h3>Pendentes Agora</h3>
+                    </div>
                 </div>
-                <div class="card stat-card stat-card--danger">
-                    <div class="stat-value">${data.maquinasParadas || 0}</div>
-                    <div class="stat-label">Máquinas Paradas</div>
+                <div class="card stat-card card-danger">
+                    <div class="stat-info">
+                        <p class="stat-value">${data.maquinasParadas || 0}</p>
+                        <h3>Máquinas Paradas</h3>
+                    </div>
                 </div>
                 <div class="card stat-card">
-                    <div class="stat-value">${formatInterval(data.tempoCiclo)}</div>
-                    <div class="stat-label">Tempo Médio de Ciclo</div>
+                    <div class="stat-info">
+                        <p class="stat-value">${formatInterval(data.tempoCiclo)}</p>
+                        <h3>Tempo Médio de Ciclo</h3>
+                    </div>
                 </div>
             `;
 
