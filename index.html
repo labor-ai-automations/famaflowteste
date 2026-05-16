@@ -1800,6 +1800,14 @@ body.fullscreen-flow .flowchart-monitor-bar {
     font-size: 1.5rem;
     font-weight: 800;
 }
+
+/* Animação para o status de "Em Atendimento" da equipe */
+@keyframes pulse-warning {
+    0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
+    70% { box-shadow: 0 0 0 6px rgba(245, 158, 11, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+
 /* ================================================
    FIM - CSS DO DASHBOARD DE MANUTENÇÃO (v3 - BI)
    ================================================ */
@@ -2962,15 +2970,10 @@ const appHTML = `<div id="app-container">
                                         background-color: var(--color-background) !important;
                                     }
 									
-									/* Animação para o status de "Em Atendimento" da equipe */
-@keyframes pulse-warning {
-    0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
-    70% { box-shadow: 0 0 0 6px rgba(245, 158, 11, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
-}
-									
+
                                 </style>
-                                <div class="form-group" style="margin-bottom: 0; position: relative;">
+                                
+								<div class="form-group" style="margin-bottom: 0; position: relative;">
                                     <input type="text" id="dash-date-range" class="input-field dash-date-picker-fix" placeholder="Selecione o período..." style="height: 38px; font-weight: 600; cursor: pointer;">
                                     <span class="material-icons" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--color-brand-primary); font-size: 18px; pointer-events: none; z-index: 5;">date_range</span>
                                 </div>
