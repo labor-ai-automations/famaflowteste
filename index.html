@@ -9173,7 +9173,7 @@ async function saveTechnician() {
             document.getElementById('maintenance-execution-modal').classList.remove('visible');
         }
 
-function renderOptimizedMaintenanceTable() {
+async function renderOptimizedMaintenanceTable() {
             const tableBody = document.getElementById('manage-maintenance-table-body');
             const paginationContainer = document.getElementById('maintenance-pagination-controls');
             if (!tableBody || !paginationContainer) return;
@@ -9199,6 +9199,22 @@ function renderOptimizedMaintenanceTable() {
                 return;
             }
 
+            // BUSCA ATIVA DAS AVALIAÇÕES PARA BURLAR A VIEW DESATUALIZADA
+            // Pega os IDs apenas das OSs "Executadas" que estão aparecendo nesta página específica
+            const executedIds = paginatedItems.filter(r => r.status === 'executed').map(r => r.id);
+            let ratingsMap = {};
+            
+            if (executedIds.length > 0) {
+                const { data: ratingsData } = await supabaseClient
+                    .from('requests')
+                    .select('id, feedback_rating, feedback_comment')
+                    .in('id', executedIds);
+                    
+                if (ratingsData) {
+                    ratingsData.forEach(rt => ratingsMap[rt.id] = rt);
+                }
+            }
+
             const statusTranslations = { 'pending': 'Pendente', 'planned': 'Planejada', 'executed': 'Executada', 'pending_manager_check': 'Com Gerente' };
 
             tableBody.innerHTML = paginatedItems.map(req => {
@@ -9215,7 +9231,6 @@ function renderOptimizedMaintenanceTable() {
                     technicians = req.data?.tecnicos_planejados || 'N/A';
                 }
 
-                // CORREÇÃO: DECLARAÇÃO DA VARIÁVEL FALTANTE
                 const situacaoMaquina = req.data?.situacao_maquina || 'N/A';
                 let situacaoClass = '';
                 if (situacaoMaquina === 'Maquina parada') {
@@ -9223,7 +9238,6 @@ function renderOptimizedMaintenanceTable() {
                 } else if (situacaoMaquina.includes('risco')) {
                     situacaoClass = 'text-warning';
                 }
-                // FIM DA CORREÇÃO
 
                 const btnVerDetalhes = `<div style="width: 110px;"><button class="btn btn-secondary" onclick="openRequestDetailsModal('${req.id}')">Ver Detalhes</button></div>`;
                 let btnAcao = `<div style="width: 110px;"></div>`;
@@ -9233,19 +9247,21 @@ function renderOptimizedMaintenanceTable() {
                 } else if (req.status === 'planned') {
                     btnAcao = `<div style="width: 110px;"><button class="btn btn-success" onclick="executeMaintenanceRequestHandler('${req.id}')">Executar</button></div>`;
                 } else if (req.status === 'executed') {
-                    // SE ESTIVER EXECUTADA: Troca o botão de ação pela Avaliação
-                    if (req.feedback_rating) {
-                        // Se tem nota, mostra as estrelinhas e o comentário no tooltip (hover)
-                        const starsHTML = '★'.repeat(req.feedback_rating) + '☆'.repeat(5 - req.feedback_rating);
-                        const commentTooltip = req.feedback_comment ? req.feedback_comment.replace(/"/g, '&quot;') : 'Sem comentário';
+                    
+                    // A MÁGICA ACONTECE AQUI: Usamos a nota que acabamos de buscar ativamente
+                    const notaReal = ratingsMap[req.id]?.feedback_rating || req.feedback_rating;
+                    const commentReal = ratingsMap[req.id]?.feedback_comment || req.feedback_comment;
+
+                    if (notaReal) {
+                        const starsHTML = '★'.repeat(notaReal) + '☆'.repeat(5 - notaReal);
+                        const commentTooltip = commentReal ? commentReal.replace(/"/g, '&quot;') : 'Sem comentário';
                         
                         btnAcao = `
                             <div style="width: 110px; display: flex; flex-direction: column; align-items: flex-end;" title="${commentTooltip}">
                                 <span style="color: var(--color-warning); font-size: 1.2rem; letter-spacing: 2px; cursor: help;">${starsHTML}</span>
-                                <span style="font-size: 0.65rem; color: var(--color-text-secondary); text-transform: uppercase;">${req.feedback_rating}/5</span>
+                                <span style="font-size: 0.65rem; color: var(--color-text-secondary); text-transform: uppercase;">${notaReal}/5</span>
                             </div>`;
                     } else {
-                        // Se não tem nota ainda
                         btnAcao = `
                             <div style="width: 110px; text-align: right;">
                                 <span style="font-size: 0.75rem; color: var(--color-text-secondary); font-style: italic;">Aguardando<br>Avaliação</span>
