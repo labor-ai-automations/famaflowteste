@@ -137,8 +137,8 @@ let currentEditingKBId = null; // Controle para saber se estamos editando na KB
         .btn-primary { padding: 1rem; border: none; border-radius: 8px; background-color: var(--color-brand-primary); color: white; font-size: 1rem; font-weight: 600; cursor: pointer; transition: opacity: 0.2s; }
         #app-container, .login-wrapper { display: none; }
         #app-container.visible, .login-wrapper.visible { display: flex; }
-        .sidebar { width: 260px; background-color: var(--color-surface); border-right: 1px solid var(--color-border); padding: 1.5rem; display: flex; flex-direction: column; height: 100vh; position: fixed; }
-        .sidebar-header { margin-bottom: 2rem; } .sidebar-logo { width: 120px; }
+        .sidebar { width: 280px; background-color: var(--color-surface); border-right: 1px solid var(--color-border); padding: 1.5rem; display: flex; flex-direction: column; height: 100vh; position: fixed; }
+        .sidebar-header { margin-bottom: 2rem; text-align: center; } .sidebar-logo { width: 240px; max-width: 100%; height: auto; }
         .nav-menu { list-style: none; padding: 0; margin: 0; } .nav-menu li { margin-bottom: 0.5rem; }
         .nav-link { display: flex; align-items: center; padding: 0.75rem 1rem; border-radius: 8px; text-decoration: none; color: var(--color-text-secondary); font-weight: 500; transition: background-color 0.2s, color 0.2s; }
         .nav-link .material-icons { margin-right: 1rem; }
@@ -155,7 +155,7 @@ let currentEditingKBId = null; // Controle para saber se estamos editando na KB
         .profile-shortcut .user-name { font-weight: 600; font-size: 0.9rem; }
         .profile-shortcut .user-role { font-size: 0.8rem; color: var(--color-text-secondary); }
 
-        main.content { flex: 1; margin-left: 260px; padding: 2rem 3rem; overflow-y: auto; background-color: var(--color-background); position: relative; }
+        main.content { flex: 1; margin-left: 280px; padding: 2rem 3rem; overflow-y: auto; background-color: var(--color-background); position: relative; }
         .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
         .page-header h1 { margin: 0; font-size: 1.8rem; display: flex; align-items: center; gap: 1rem;} .page-header p { margin: 5px 0 0 0; color: var(--color-text-secondary); }
         .page-header-actions { display: flex; align-items: center; gap: 1rem; }
