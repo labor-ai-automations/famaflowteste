@@ -9,6 +9,7 @@
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
     <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 
 let currentSelectionTarget = null;
@@ -1913,6 +1914,8 @@ body.fullscreen-flow .flowchart-monitor-bar {
             </div>
         </div>
     </div>
+	
+	
 
     <script>
         const SUPABASE_URL = 'https://flegnghsopbrulnnpuvz.supabase.co';
@@ -2570,7 +2573,8 @@ const appHTML = `<div id="app-container">
                     </div>
 
                     <div class="mgt-tabs">
-                        <button class="mgt-tab-btn active" id="tab-btn-my-maintenance" onclick="switchMaintenanceTab('my_requests')">Minhas Solicitações</button>
+                        <button class="mgt-tab-btn" id="tab-btn-my-maintenance" onclick="switchMaintenanceTab('my_requests')">Minhas Solicitações</button>
+                        <button class="mgt-tab-btn active" id="tab-btn-dashboard" onclick="switchMaintenanceTab('dashboard')">Dashboard</button>
                         <button class="mgt-tab-btn" id="tab-btn-manage-maintenance" style="display:none;" onclick="switchMaintenanceTab('manage')">Gerenciar Pendências</button>
                         <button class="mgt-tab-btn" id="tab-btn-technicians" style="display:none;" onclick="switchMaintenanceTab('technicians')">Equipe Técnica</button>
                         <button class="mgt-tab-btn" id="tab-btn-preventive" style="display:none;" onclick="switchMaintenanceTab('preventive')">Calendário Preventivo</button>
@@ -2621,6 +2625,41 @@ const appHTML = `<div id="app-container">
                      <div id="maintenance-tab-preventive" class="maintenance-tab-content" style="display:none;">
                         <div class="empty-state">Calendário de Manutenção Preventiva - Em breve.</div>
                     </div>
+                    
+                    <!-- NOVO DASHBOARD DE MANUTENÇÃO -->
+                    <div id="maintenance-tab-dashboard" class="maintenance-tab-content" style="display:block;">
+                        <div class="card" style="margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+                            <h3 style="margin: 0; font-size: 1.2rem;">Filtros do Dashboard</h3>
+                            <div style="display: flex; align-items: center; gap: 1rem;">
+                                <div class="form-group" style="margin: 0;">
+                                    <label for="dash-start-date" style="font-size: 0.8rem; font-weight: 600;">Data Inicial</label>
+                                    <input type="date" id="dash-start-date" class="input-field" style="padding: 0.5rem;">
+                                </div>
+                                <div class="form-group" style="margin: 0;">
+                                    <label for="dash-end-date" style="font-size: 0.8rem; font-weight: 600;">Data Final</label>
+                                    <input type="date" id="dash-end-date" class="input-field" style="padding: 0.5rem;">
+                                </div>
+                                <button id="btn-apply-dash-filters" class="btn btn-danger" style="align-self: flex-end;">Aplicar</button>
+                            </div>
+                        </div>
+                        
+                        <div id="dashboard-kpi-cards" class="grid grid-cols-4" style="gap: 1.5rem; margin-bottom: 2rem;">
+                            <!-- Cards de KPI serão injetados aqui pelo JS -->
+                        </div>
+
+                        <div class="grid grid-cols-2" style="gap: 1.5rem;">
+                            <div class="card">
+                                <h4 class="card-title">Volume de OS por Dia</h4>
+                                <canvas id="chart-os-volume"></canvas>
+                            </div>
+                             <div class="card">
+                                <h4 class="card-title">Top 5 Equipamentos com Mais Chamados</h4>
+                                <div id="list-top-equipments"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- FIM DO DASHBOARD -->
+
                 </div>
 				
 <!-- PÁGINA DE FEEDBACK (REESTRUTURADA COM ABAS) -->
@@ -8323,7 +8362,23 @@ async function executeMaintenanceRequestHandler(requestId) {
             if (buttonToActivate) {
                 buttonToActivate.classList.add('active');
             }
+
+            // ATIVA O CARREGAMENTO DO DASHBOARD
+            if (tabId === 'dashboard') {
+                // Apenas chama a função se ela não tiver sido chamada ainda para evitar múltiplas execuções
+                if (!document.getElementById('dashboard-kpi-cards').hasChildNodes()) {
+                    loadMaintenanceDashboard();
+                }
+            }
         }
+
+        // Adiciona o event listener para o botão de aplicar filtros do dashboard
+        document.addEventListener('DOMContentLoaded', () => {
+             const btnApply = document.getElementById('btn-apply-dash-filters');
+             if(btnApply) {
+                 btnApply.addEventListener('click', loadMaintenanceDashboard);
+             }
+        });
 
 async function openEvaluationModal(requestId) {
             // Primeiro, abre o modal de detalhes normalmente
@@ -12103,8 +12158,130 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
         if(btn) btn.disabled = false;
     }
 }
-		
+
+// --- LÓGICA DO NOVO DASHBOARD DE MANUTENÇÃO ---
+
+        // Função para formatar intervalos de tempo (ex: "2h 30m")
+        function formatInterval(interval) {
+            if (!interval) return 'N/A';
+            // Tenta extrair dias, horas, minutos de um formato como '2 days, 14:30:00'
+            const parts = interval.match(/(\d+)\s*days?,?\s*(\d+):(\d+):/);
+            if (parts) {
+                const days = parseInt(parts[1], 10);
+                const hours = parseInt(parts[2], 10) + (days * 24);
+                const minutes = parseInt(parts[3], 10);
+                if (hours > 0) return `${hours}h ${minutes}m`;
+                return `${minutes}m`;
+            }
+            // Tenta extrair de um formato como '02:30:00'
+            const timeParts = interval.split(':');
+            if (timeParts.length >= 2) {
+                const hours = parseInt(timeParts[0], 10);
+                const minutes = parseInt(timeParts[1], 10);
+                if (isNaN(hours) || isNaN(minutes)) return 'N/A';
+                if (hours > 0) return `${hours}h ${minutes}m`;
+                return `${minutes}m`;
+            }
+            return 'N/A';
+        }
+
+        async function loadMaintenanceDashboard() {
+            const startDateInput = document.getElementById('dash-start-date');
+            const endDateInput = document.getElementById('dash-end-date');
+            const cardsContainer = document.getElementById('dashboard-kpi-cards');
+            const topEquipmentsList = document.getElementById('list-top-equipments');
+            const chartCanvas = document.getElementById('chart-os-volume');
+
+            if (!startDateInput || !cardsContainer || !topEquipmentsList || !chartCanvas) return;
+
+            // Define um período padrão (últimos 30 dias) se não houver datas
+            if (!startDateInput.value || !endDateInput.value) {
+                const today = new Date();
+                const thirtyDaysAgo = new Date();
+                thirtyDaysAgo.setDate(today.getDate() - 30);
+                endDateInput.value = today.toISOString().split('T')[0];
+                startDateInput.value = thirtyDaysAgo.toISOString().split('T')[0];
+            }
+            
+            cardsContainer.innerHTML = `<div class="empty-state" style="grid-column: 1 / -1;">Carregando métricas...</div>`;
+            topEquipmentsList.innerHTML = '';
+            
+            const { data, error } = await supabaseClient.rpc('get_maintenance_dashboard_kpis', {
+                start_date: startDateInput.value,
+                end_date: endDateInput.value + 'T23:59:59'
+            });
+
+            if (error) {
+                console.error("Erro ao carregar KPIs do dashboard:", error);
+                cardsContainer.innerHTML = `<div class="empty-state" style="color:var(--color-danger); grid-column: 1 / -1;">Falha ao carregar métricas.</div>`;
+                return;
+            }
+
+            // Renderiza os Cards de KPI
+            cardsContainer.innerHTML = `
+                <div class="card stat-card"><div class="stat-info"><h3>OS Abertas</h3><p>${data.totalOS || 0}</p></div></div>
+                <div class="card stat-card"><div class="stat-info"><h3>Pendentes Agora</h3><p>${(data.pendentes || 0) + (data.planejadas || 0)}</p></div></div>
+                <div class="card stat-card card-danger"><div class="stat-info"><h3>Máquinas Paradas</h3><p>${data.maquinasParadas || 0}</p></div></div>
+                <div class="card stat-card"><div class="stat-info"><h3>Tempo Médio de Ciclo</h3><p>${formatInterval(data.tempoCiclo)}</p></div></div>
+            `;
+            
+            // Renderiza a lista de Top Equipamentos
+            if(data.topEquipments && data.topEquipments.length > 0) {
+                topEquipmentsList.innerHTML = data.topEquipments.map(item => `
+                    <div style="display:flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--color-border);">
+                        <strong>${item.equipamento}</strong>
+                        <span>${item.total} chamados</span>
+                    </div>`).join('');
+            } else {
+                topEquipmentsList.innerHTML = `<div class="empty-state" style="padding:1rem 0;">Sem dados de equipamentos.</div>`;
+            }
+
+            // Renderiza o Gráfico
+            const ctx = chartCanvas.getContext('2d');
+            if (window.osVolumeChart) { window.osVolumeChart.destroy(); }
+            
+            const labels = [...new Set((data.dailyVolume || []).map(d => new Date(d.dia).toLocaleDateString('pt-BR', {timeZone: 'UTC'})))].sort((a,b) => new Date(a.split('/').reverse().join('-')) - new Date(b.split('/').reverse().join('-')));
+            const executedData = [];
+            const pendingData = [];
+            const plannedData = [];
+
+            labels.forEach(label => {
+                const date = new Date(label.split('/').reverse().join('-') + 'T12:00:00Z').toISOString().split('T')[0];
+                let pendingTotal = 0;
+                let plannedTotal = 0;
+                let executedTotal = 0;
+                (data.dailyVolume || []).forEach(d => {
+                    if (d.dia === date) {
+                        if (d.status === 'executed') executedTotal += d.total;
+                        else if (d.status === 'planned') plannedTotal += d.total;
+                        else if (d.status === 'pending' || d.status === 'pending_manager_check') pendingTotal += d.total;
+                    }
+                });
+                executedData.push(executedTotal);
+                pendingData.push(pendingTotal);
+                plannedData.push(plannedTotal);
+            });
+
+            window.osVolumeChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Pendentes', data: pendingData, backgroundColor: 'rgba(245, 158, 11, 0.7)' },
+                        { label: 'Planejadas', data: plannedData, backgroundColor: 'rgba(59, 130, 246, 0.7)' },
+                        { label: 'Executadas', data: executedData, backgroundColor: 'rgba(16, 185, 129, 0.7)' }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+                    plugins: { legend: { position: 'top' } }
+                }
+            });
+        }
+
     </script>
+		
 
 <!-- NOTES MODAL (FOR APPROVAL/REJECTION) -->
     <div id="notes-modal" class="modal-overlay">
