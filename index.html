@@ -2961,6 +2961,14 @@ const appHTML = `<div id="app-container">
                                         width: 290px !important; /* LARGURA AUMENTADA */
                                         background-color: var(--color-background) !important;
                                     }
+									
+									/* Animação para o status de "Em Atendimento" da equipe */
+@keyframes pulse-warning {
+    0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
+    70% { box-shadow: 0 0 0 6px rgba(245, 158, 11, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+									
                                 </style>
                                 <div class="form-group" style="margin-bottom: 0; position: relative;">
                                     <input type="text" id="dash-date-range" class="input-field dash-date-picker-fix" placeholder="Selecione o período..." style="height: 38px; font-weight: 600; cursor: pointer;">
@@ -12825,48 +12833,89 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
                     const planned = myReqs.filter(r => r.status === 'planned');
                     const executedInPeriod = myReqs.filter(r => r.status === 'executed');
 
-                    // Painel de Carga
+                    // Painel de Carga Otimizado Visualmente
                     const isBusy = planned.length > 0;
-                    const currentOS = isBusy ? (planned[0].data?.equipamento || 'Equipamento...') : 'Pronto para próxima OS';
-                    const statusClass = isBusy ? 'status-busy' : 'status-available';
-                    const statusLabel = isBusy ? 'Em Atendimento' : 'Disponível';
+                    const currentOS = isBusy ? (planned[0].data?.equipamento || 'OS sem descrição') : 'Aguardando novas atribuições';
+                    
+                    // Indicadores visuais dinâmicos
+                    const pulseDot = isBusy ? `<span style="display:inline-block; width:8px; height:8px; background:var(--color-warning); border-radius:50%; margin-right:5px; animation: pulse-warning 2s infinite;"></span>` : `<span class="material-icons" style="font-size:14px; margin-right:4px; vertical-align:middle;">check_circle</span>`;
+                    const statusColor = isBusy ? 'var(--color-warning)' : 'var(--color-success)';
+                    const statusLabel = isBusy ? 'EM ATENDIMENTO' : 'DISPONÍVEL';
+                    
+                    // Gramática da Fila
+                    let filaTexto = `<span style="color:var(--color-text-secondary); font-size:1.2rem;">Nenhuma</span>`;
+                    if (planned.length === 1) filaTexto = `<strong style="font-size:1.5rem; color:var(--color-text-primary);">1</strong> <span style="font-size:0.9rem;">OS</span>`;
+                    if (planned.length > 1) filaTexto = `<strong style="font-size:1.5rem; color:${planned.length > 3 ? 'var(--color-danger)' : 'var(--color-text-primary)'};">${planned.length}</strong> <span style="font-size:0.9rem;">OSs</span>`;
 
                     loadHtml += `
-                        <div class="technician-load-card">
-                            <div class="technician-header">
+                        <div class="technician-load-card" style="${isBusy ? 'border-top: 4px solid var(--color-warning);' : 'border-top: 4px solid var(--color-surface);'}">
+                            <div class="technician-header" style="border-bottom:none; padding-bottom:0;">
                                 <div class="technician-avatar">${tech.name.charAt(0)}</div>
-                                <div><div class="technician-name">${tech.name}</div><div style="font-size: 0.8rem; color: var(--color-text-secondary);">${tech.specialty || 'Técnico'}</div></div>
+                                <div>
+                                    <div class="technician-name">${tech.name}</div>
+                                    <div style="font-size: 0.75rem; color: var(--color-text-secondary);">${tech.specialty || 'Técnico de Manutenção'}</div>
+                                </div>
                             </div>
-                            <div class="technician-status-card ${statusClass}"><div class="status-title">${statusLabel}</div><div class="status-details">${currentOS}</div></div>
-                            <div class="technician-backlog-card">
+                            
+                            <div style="margin-top: 10px; padding: 12px; background: var(--color-background); border-radius: 8px;">
+                                <div style="font-size: 0.7rem; font-weight: 800; color: ${statusColor}; letter-spacing: 0.05em; margin-bottom: 4px; display:flex; align-items:center;">
+                                    ${pulseDot} ${statusLabel}
+                                </div>
+                                <div style="font-size: 0.9rem; font-weight: 500; color: var(--color-text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                    ${currentOS}
+                                </div>
+                            </div>
+
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-top: auto; padding-top: 10px;">
                                 <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--color-text-secondary); font-weight: 700;">Fila de Espera</div>
-                                <div class="backlog-value" style="color: ${planned.length > 3 ? 'var(--color-danger)' : 'var(--color-text-primary)'}">${planned.length} OSs</div>
+                                <div>${filaTexto}</div>
                             </div>
                         </div>`;
 
-                    // Tabela de Performance
-                    let totalRepairTimeMs = 0; let validExecutions = 0;
-                    executedInPeriod.forEach(r => {
-                        if (r.data_planejamento && r.data_execucao) {
-                            const start = new Date(r.data_planejamento).getTime(); const end = new Date(r.data_execucao).getTime();
-                            if (end > start) { totalRepairTimeMs += (end - start); validExecutions++; }
-                        }
-                    });
-                    const avgTimeMs = validExecutions > 0 ? (totalRepairTimeMs / validExecutions) : 0;
-                    const avgRepairStr = validExecutions > 0 ? `${Math.floor(avgTimeMs / 3600000)}h ${Math.floor((avgTimeMs % 3600000) / 60000)}m` : 'N/A';
-
+                    // LÓGICA DA TABELA DE PERFORMANCE E CORREÇÃO DO N/A
                     tableHtml += `
                         <tr>
-                            <td><strong>${tech.name}</strong></td>
-                            <td style="font-weight: 700; color: var(--color-success);">${executedInPeriod.length}</td>
-                            <td>${avgRepairStr}</td>
-                            <td><span class="status-tag ${planned.length > 3 ? 'status-danger' : 'status-planned'}">${planned.length} OSs</span></td>
-                        </tr>`;
+                            <td>
+                                <div style="display:flex; align-items:center; gap:10px;">
+                                    <div class="technician-avatar" style="width:28px; height:28px; font-size:0.8rem;">${tech.name.charAt(0)}</div>
+                                    <strong>${tech.name}</strong>
+                                </div>
+                            </td>
+                            <td>
+                                ${executedInPeriod.length > 0 
+                                    ? `<span style="background:var(--color-success-bg); color:var(--color-success); padding:4px 12px; border-radius:20px; font-weight:800;">${executedInPeriod.length}</span>` 
+                                    : `<span style="color:var(--color-text-secondary);">-</span>`}
+                            </td>
+                            <td id="mttr-tech-${tech.id}"><span class="material-icons refresh-spin" style="font-size:14px;">sync</span></td>
+                            <td>
+                                ${planned.length > 0
+                                    ? `<span style="background:${planned.length > 3 ? 'var(--color-danger-bg)' : 'var(--color-warning-bg)'}; color:${planned.length > 3 ? 'var(--color-danger)' : 'var(--color-warning)'}; padding:4px 12px; border-radius:20px; font-weight:800;">${planned.length} OS${planned.length > 1 ? 's' : ''}</span>`
+                                    : `<span style="color:var(--color-text-secondary);">-</span>`}
+                            </td>
+                        </tr>
+                    `;
+
+                    // Busca assíncrona do tempo de reparo (MTTR) para não travar a tela
+                    if (executedInPeriod.length > 0) {
+                        const osIds = executedInPeriod.map(r => r.id);
+                        supabaseClient.from('request_history').select('request_id, status, created_at').in('request_id', osIds)
+                        .then(({data: hist}) => {
+                            let totalMs = 0, valid = 0;
+                            osIds.forEach(osId => {
+                                const p = hist.find(h => h.request_id === osId && h.status === 'planned');
+                                const e = hist.find(h => h.request_id === osId && h.status === 'executed');
+                                if(p && e) {
+                                    totalMs += (new Date(e.created_at) - new Date(p.created_at));
+                                    valid++;
+                                }
+                            });
+                            const avgStr = valid > 0 ? `${Math.floor((totalMs/valid)/3600000)}h ${Math.floor(((totalMs/valid)%3600000)/60000)}m` : 'N/A';
+                            document.getElementById(`mttr-tech-${tech.id}`).innerHTML = `<strong style="color:var(--color-text-primary);">${avgStr}</strong>`;
+                        });
+                    } else {
+                        setTimeout(() => document.getElementById(`mttr-tech-${tech.id}`).innerHTML = `<span style="color:var(--color-text-secondary);">-</span>`, 100);
+                    }
                 });
-                teamLoadPanel.innerHTML = loadHtml;
-                teamPerfTable.innerHTML = tableHtml || `<tr><td colspan="4" class="empty-state">Sem dados processados.</td></tr>`;
-            }
-        }
 
     </script>
 		
