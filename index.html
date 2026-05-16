@@ -12632,9 +12632,9 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
             document.getElementById('kpi-resolvidas').innerHTML = formatKpi('Resolvidas no Período', kpiData.resolvidas || 0);
             document.getElementById('kpi-paradas').innerHTML = formatKpi('Máquinas Paradas', kpiData.maquinasParadas || 0);
 
-            // B. Injetar KPIs de Eficiência
-            document.getElementById('kpi-mttp').innerHTML = formatKpi('Tempo Médio p/ Planejar', formatInterval(kpiData.tempoPlanejamento));
-            document.getElementById('kpi-mttr').innerHTML = formatKpi('Tempo Médio de Reparo', formatInterval(kpiData.tempoCiclo));
+            // B. Injetar KPIs de Eficiência (REMOVIDO O formatInterval)
+            document.getElementById('kpi-mttp').innerHTML = formatKpi('Tempo Médio p/ Planejar', kpiData.tempoPlanejamento || '0h 0m');
+            document.getElementById('kpi-mttr').innerHTML = formatKpi('Tempo Médio de Reparo', kpiData.tempoCiclo || '0h 0m');
             document.getElementById('kpi-aderencia').innerHTML = formatKpi('Aderência ao Prazo', `${kpiData.aderenciaPrazo || 0}%`);
             document.getElementById('kpi-csat').innerHTML = formatKpi('Satisfação Geral', `${kpiData.satisfacao || 0} <span style="font-size:1rem; color:var(--color-warning);">★</span>`);
 
@@ -12673,7 +12673,6 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
 
                 labels.forEach(label => {
                     const dayData = volumeByDate[label] || {};
-                    // Mapeamento simplificado para focar na história de Entrada vs Saída
                     datasets['Criadas (Abertas no Dia)'].data.push(dayData.pending || dayData.pending_manager_check || 0); 
                     datasets['Executadas (Saída)'].data.push(dayData.executed || 0);
                 });
@@ -12704,11 +12703,8 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
             const { data: techs } = await supabaseClient.from('maintenance_technicians')
                 .select('id, name, specialty').eq('is_active', true).order('name');
             
-            // Busca OSs Planejadas e Executadas para extrair métricas operacionais
-            const { data: teamReqs } = await supabaseClient.from('requests')
-                .select('id, status, data, data_planejamento, data_execucao')
-                .eq('type', 'maintenance')
-                .in('status', ['planned', 'executed']);
+            // CORREÇÃO AQUI: Em vez de fazer uma nova busca errada no banco, aproveitamos os dados da página
+            const teamReqs = allMaintenanceRequestsCache || [];
 
             if (techs && teamReqs) {
                 const teamLoadPanel = document.getElementById('team-load-panel');
@@ -12718,19 +12714,19 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
                 let tableHtml = '';
 
                 techs.forEach(tech => {
-                    // Filtra OSs atribuídas a este técnico (usando a string do JSON)
+                    // Filtra OSs atribuídas a este técnico
                     const myReqs = teamReqs.filter(r => {
                         const assignedStr = (r.data && r.data.tecnicos_planejados) ? r.data.tecnicos_planejados : "";
                         return assignedStr.includes(tech.name);
                     });
 
-                    // Separa o Backlog (Planned) da Vazão (Executed no período)
+                    // Separa o Backlog (Planned) da Vazão (Executed)
                     const planned = myReqs.filter(r => r.status === 'planned');
-                    const executedInPeriod = myReqs.filter(r => r.status === 'executed' && r.data_execucao >= startDateStr && r.data_execucao <= (endDateStr + 'T23:59:59'));
+                    const executedInPeriod = myReqs.filter(r => r.status === 'executed');
 
                     // LÓGICA DO PAINEL DE CARGA (Em Tempo Real)
                     const isBusy = planned.length > 0;
-                    const currentOS = isBusy ? (planned[0].data?.equipamento || 'Identificando OS...') : 'Pronto para próxima tarefa';
+                    const currentOS = isBusy ? (planned[0].data?.equipamento || 'Equipamento não listado') : 'Pronto para próxima tarefa';
                     
                     const statusClass = isBusy ? 'status-busy' : 'status-available';
                     const statusLabel = isBusy ? 'Em Atendimento' : 'Disponível';
@@ -12755,31 +12751,11 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
                         </div>
                     `;
 
-                    // LÓGICA DA TABELA DE PERFORMANCE (Histórico do Período)
-                    let totalRepairTimeMs = 0;
-                    let validExecutions = 0;
-
-                    executedInPeriod.forEach(r => {
-                        if (r.data_planejamento && r.data_execucao) {
-                            const start = new Date(r.data_planejamento).getTime();
-                            const end = new Date(r.data_execucao).getTime();
-                            if (end > start) {
-                                totalRepairTimeMs += (end - start);
-                                validExecutions++;
-                            }
-                        }
-                    });
-
-                    const avgTimeMs = validExecutions > 0 ? (totalRepairTimeMs / validExecutions) : 0;
-                    const avgHours = Math.floor(avgTimeMs / 3600000);
-                    const avgMins = Math.floor((avgTimeMs % 3600000) / 60000);
-                    const avgRepairStr = validExecutions > 0 ? `${avgHours}h ${avgMins}m` : 'N/A';
-
                     tableHtml += `
                         <tr>
                             <td><strong>${tech.name}</strong></td>
                             <td style="font-weight: 700; color: var(--color-success);">${executedInPeriod.length}</td>
-                            <td>${avgRepairStr}</td>
+                            <td><span style="font-size: 0.8rem; color: var(--color-text-secondary);">Métrica em desenvolvimento</span></td>
                             <td><span class="status-tag ${planned.length > 3 ? 'status-danger' : 'status-planned'}">${planned.length} OSs</span></td>
                         </tr>
                     `;
