@@ -1508,6 +1508,37 @@ body.fullscreen-flow .flowchart-monitor-bar {
 @media (max-width: 1200px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 768px) { .charts-grid { grid-template-columns: 1fr; } .dashboard-filter-bar { flex-direction: column; align-items: stretch; } }
 
+/* NOVOS ESTILOS PARA INTERATIVIDADE */
+.kpi-grid .stat-card {
+    transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+}
+.kpi-grid .stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow);
+}
+#list-top-equipments > div {
+    cursor: pointer;
+    transition: background-color 0.2s ease-out;
+    border-radius: 6px;
+    margin: 0 -0.5rem;
+    padding: 0.5rem;
+}
+#list-top-equipments > div:hover {
+    background-color: var(--color-background);
+}
+.stat-card {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+}
+.stat-card.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+#chart-os-volume {
+    cursor: pointer;
+}
+
 
 		
     </style>
@@ -12232,14 +12263,28 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
             return 'N/A';
         }
 
+        let currentDashboardFilters = {
+            setor: null
+        };
+
+        function applySectorFilter(setor) {
+            // Se o setor clicado já é o filtro ativo, limpa o filtro
+            if (currentDashboardFilters.setor === setor) {
+                currentDashboardFilters.setor = null;
+            } else {
+                currentDashboardFilters.setor = setor;
+            }
+            loadMaintenanceDashboard(); // Recarrega o dashboard com o novo filtro
+        }
+
         async function loadMaintenanceDashboard() {
             const startDateInput = document.getElementById('dash-start-date');
             const endDateInput = document.getElementById('dash-end-date');
             const cardsContainer = document.getElementById('dashboard-kpi-cards');
-            const topEquipmentsList = document.getElementById('list-top-equipments');
+            const topSectorsList = document.getElementById('list-top-equipments');
             const chartCanvas = document.getElementById('chart-os-volume');
 
-            if (!startDateInput || !cardsContainer || !topEquipmentsList || !chartCanvas) return;
+            if (!startDateInput || !cardsContainer || !topSectorsList || !chartCanvas) return;
 
             if (!startDateInput.value || !endDateInput.value) {
                 const today = new Date();
@@ -12250,14 +12295,14 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
             }
             
             cardsContainer.innerHTML = `<div class="empty-state" style="grid-column: 1 / -1;">Carregando métricas...</div>`;
-            topEquipmentsList.innerHTML = '';
+            topSectorsList.innerHTML = '';
             
             const { data, error } = await supabaseClient.rpc('get_maintenance_dashboard_kpis', {
                 start_date: startDateInput.value,
-                end_date: endDateInput.value + 'T23:59:59'
+                end_date: endDateInput.value + 'T23:59:59',
+                p_setor: currentDashboardFilters.setor // Passa o filtro de setor para a RPC
             }).single();
 
-            // PONTO DE DEPURAÇÃO: VERIFIQUE O CONSOLE DO NAVEGADOR
             console.log('Dados recebidos do Supabase para o dashboard:', data);
 
             if (error) {
@@ -12265,8 +12310,7 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
                 cardsContainer.innerHTML = `<div class="empty-state" style="color:var(--color-danger); grid-column: 1 / -1;">Falha ao carregar métricas.</div>`;
                 return;
             }
-
-            // Renderiza os Cards de KPI com a nova estrutura
+            
             cardsContainer.innerHTML = `
                 <div class="card stat-card">
                     <div class="stat-value">${data.totalOS || 0}</div>
@@ -12285,20 +12329,24 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
                     <div class="stat-label">Tempo Médio de Ciclo</div>
                 </div>
             `;
-            
-// Renderiza a lista de Top Setores
-            const topSectorsList = document.getElementById('list-top-equipments'); // Mantemos o ID do elemento para não precisar alterar o HTML
+
+            // Adiciona a animação de entrada aos cards
+            document.querySelectorAll('.stat-card').forEach((card, index) => {
+                setTimeout(() => {
+                    card.classList.add('visible');
+                }, index * 100);
+            });
+
             if(data.topSectors && Array.isArray(data.topSectors) && data.topSectors.length > 0) {
                 topSectorsList.innerHTML = data.topSectors.map(item => `
-                    <div style="display:flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--color-border);">
-                        <strong>${item.setor}</strong>
+                    <div onclick="applySectorFilter('${item.setor}')" style="${currentDashboardFilters.setor === item.setor ? 'background-color: var(--color-background); font-weight: 700;' : ''}">
+                        <span>${item.setor}</span>
                         <span>${item.total} chamados</span>
                     </div>`).join('');
             } else {
                 topSectorsList.innerHTML = `<div class="empty-state" style="padding:1rem 0;">Sem dados de setores no período.</div>`;
             }
 
-            // Renderiza o Gráfico com verificação
             if (chartCanvas && data.dailyVolume && Array.isArray(data.dailyVolume)) {
                 const ctx = chartCanvas.getContext('2d');
                 if (window.osVolumeChart) { window.osVolumeChart.destroy(); }
@@ -12319,7 +12367,7 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
 
                 labels.forEach(label => {
                     const dayData = volumeByDate[label] || {};
-                    datasets['Pendentes'].data.push(dayData.pending || 0);
+                    datasets['Pendentes'].data.push(dayData.pending || dayData.pending_manager_check || 0);
                     datasets['Planejadas'].data.push(dayData.planned || 0);
                     datasets['Executadas'].data.push(dayData.executed || 0);
                 });
