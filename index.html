@@ -12162,9 +12162,11 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
 // --- LÓGICA DO NOVO DASHBOARD DE MANUTENÇÃO ---
 
         // Função para formatar intervalos de tempo (ex: "2h 30m")
+       // --- LÓGICA DO NOVO DASHBOARD DE MANUTENÇÃO ---
+
         function formatInterval(interval) {
-            if (!interval) return 'N/A';
-            // Tenta extrair dias, horas, minutos de um formato como '2 days, 14:30:00'
+            if (!interval || typeof interval !== 'string') return 'N/A'; // Adicionado verificação de tipo
+            
             const parts = interval.match(/(\d+)\s*days?,?\s*(\d+):(\d+):/);
             if (parts) {
                 const days = parseInt(parts[1], 10);
@@ -12173,7 +12175,7 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
                 if (hours > 0) return `${hours}h ${minutes}m`;
                 return `${minutes}m`;
             }
-            // Tenta extrair de um formato como '02:30:00'
+            
             const timeParts = interval.split(':');
             if (timeParts.length >= 2) {
                 const hours = parseInt(timeParts[0], 10);
@@ -12194,7 +12196,6 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
 
             if (!startDateInput || !cardsContainer || !topEquipmentsList || !chartCanvas) return;
 
-            // Define um período padrão (últimos 30 dias) se não houver datas
             if (!startDateInput.value || !endDateInput.value) {
                 const today = new Date();
                 const thirtyDaysAgo = new Date();
@@ -12211,13 +12212,16 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
                 end_date: endDateInput.value + 'T23:59:59'
             }).single();
 
+            // PONTO DE DEPURAÇÃO: VERIFIQUE O CONSOLE DO NAVEGADOR
+            console.log('Dados recebidos do Supabase para o dashboard:', data);
+
             if (error) {
                 console.error("Erro ao carregar KPIs do dashboard:", error);
                 cardsContainer.innerHTML = `<div class="empty-state" style="color:var(--color-danger); grid-column: 1 / -1;">Falha ao carregar métricas.</div>`;
                 return;
             }
 
-            // Renderiza os Cards de KPI
+            // Renderiza os Cards de KPI com verificações de segurança
             cardsContainer.innerHTML = `
                 <div class="card stat-card"><div class="stat-info"><h3>OS Abertas</h3><p>${data.totalOS || 0}</p></div></div>
                 <div class="card stat-card"><div class="stat-info"><h3>Pendentes Agora</h3><p>${(data.pendentes || 0) + (data.planejadas || 0)}</p></div></div>
@@ -12225,59 +12229,56 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
                 <div class="card stat-card"><div class="stat-info"><h3>Tempo Médio de Ciclo</h3><p>${formatInterval(data.tempoCiclo)}</p></div></div>
             `;
             
-            // Renderiza a lista de Top Equipamentos
-            if(data.topEquipments && data.topEquipments.length > 0) {
+            // Renderiza a lista de Top Equipamentos com verificação
+            if(data.topEquipments && Array.isArray(data.topEquipments) && data.topEquipments.length > 0) {
                 topEquipmentsList.innerHTML = data.topEquipments.map(item => `
                     <div style="display:flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--color-border);">
                         <strong>${item.equipamento}</strong>
                         <span>${item.total} chamados</span>
                     </div>`).join('');
             } else {
-                topEquipmentsList.innerHTML = `<div class="empty-state" style="padding:1rem 0;">Sem dados de equipamentos.</div>`;
+                topEquipmentsList.innerHTML = `<div class="empty-state" style="padding:1rem 0;">Sem dados de equipamentos no período.</div>`;
             }
 
-            // Renderiza o Gráfico
-            const ctx = chartCanvas.getContext('2d');
-            if (window.osVolumeChart) { window.osVolumeChart.destroy(); }
-            
-            const labels = [...new Set((data.dailyVolume || []).map(d => new Date(d.dia).toLocaleDateString('pt-BR', {timeZone: 'UTC'})))].sort((a,b) => new Date(a.split('/').reverse().join('-')) - new Date(b.split('/').reverse().join('-')));
-            const executedData = [];
-            const pendingData = [];
-            const plannedData = [];
+            // Renderiza o Gráfico com verificação
+            if (chartCanvas && data.dailyVolume && Array.isArray(data.dailyVolume)) {
+                const ctx = chartCanvas.getContext('2d');
+                if (window.osVolumeChart) { window.osVolumeChart.destroy(); }
+                
+                const labels = [...new Set(data.dailyVolume.map(d => new Date(d.dia).toLocaleDateString('pt-BR', {timeZone: 'UTC'})))].sort((a,b) => new Date(a.split('/').reverse().join('-')) - new Date(b.split('/').reverse().join('-')));
+                const datasets = {
+                    'Pendentes': { backgroundColor: 'rgba(245, 158, 11, 0.7)', data: [] },
+                    'Planejadas': { backgroundColor: 'rgba(59, 130, 246, 0.7)', data: [] },
+                    'Executadas': { backgroundColor: 'rgba(16, 185, 129, 0.7)', data: [] }
+                };
 
-            labels.forEach(label => {
-                const date = new Date(label.split('/').reverse().join('-') + 'T12:00:00Z').toISOString().split('T')[0];
-                let pendingTotal = 0;
-                let plannedTotal = 0;
-                let executedTotal = 0;
-                (data.dailyVolume || []).forEach(d => {
-                    if (d.dia === date) {
-                        if (d.status === 'executed') executedTotal += d.total;
-                        else if (d.status === 'planned') plannedTotal += d.total;
-                        else if (d.status === 'pending' || d.status === 'pending_manager_check') pendingTotal += d.total;
+                const volumeByDate = data.dailyVolume.reduce((acc, curr) => {
+                    const date = new Date(curr.dia).toLocaleDateString('pt-BR', {timeZone: 'UTC'});
+                    if (!acc[date]) acc[date] = {};
+                    acc[date][curr.status] = curr.total;
+                    return acc;
+                }, {});
+
+                labels.forEach(label => {
+                    const dayData = volumeByDate[label] || {};
+                    datasets['Pendentes'].data.push(dayData.pending || 0);
+                    datasets['Planejadas'].data.push(dayData.planned || 0);
+                    datasets['Executadas'].data.push(dayData.executed || 0);
+                });
+
+                window.osVolumeChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: Object.keys(datasets).map(key => ({ label: key, ...datasets[key] }))
+                    },
+                    options: {
+                        responsive: true,
+                        scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+                        plugins: { legend: { position: 'top' } }
                     }
                 });
-                executedData.push(executedTotal);
-                pendingData.push(pendingTotal);
-                plannedData.push(plannedTotal);
-            });
-
-            window.osVolumeChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        { label: 'Pendentes', data: pendingData, backgroundColor: 'rgba(245, 158, 11, 0.7)' },
-                        { label: 'Planejadas', data: plannedData, backgroundColor: 'rgba(59, 130, 246, 0.7)' },
-                        { label: 'Executadas', data: executedData, backgroundColor: 'rgba(16, 185, 129, 0.7)' }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
-                    plugins: { legend: { position: 'top' } }
-                }
-            });
+            }
         }
 
     </script>
