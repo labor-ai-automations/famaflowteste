@@ -12651,7 +12651,7 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
 
             if (!dateInput) return;
 
-            // Inicializa o calendário profissional (Flatpickr) se for a primeira vez
+            // Inicializa o calendário profissional (Flatpickr)
             if (!window.dashCalendarInstance) {
                 const today = new Date();
                 const thirtyDaysAgo = new Date(today);
@@ -12665,7 +12665,6 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
                     locale: "pt",
                     defaultDate: [thirtyDaysAgo, today],
                     onChange: function(selectedDates) {
-                        // Só atualiza o dashboard quando o usuário selecionar as DUAS datas (início e fim)
                         if (selectedDates.length === 2) {
                             loadMaintenanceDashboard();
                         }
@@ -12673,7 +12672,6 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
                 });
             }
 
-            // Pega as datas selecionadas no calendário
             const selectedDates = window.dashCalendarInstance.selectedDates;
             if (selectedDates.length !== 2) return;
 
@@ -12683,18 +12681,15 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
             const startDateStr = formatLocalDate(startDate);
             const endDateStr = formatLocalDate(endDate);
             
-            // Para calcular médias diárias
             const diffTime = Math.abs(endDate - startDate);
             const diasPeriodo = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
 
-            // Limpa as áreas (Loading State)
+            // Loading State
             document.querySelectorAll('#dashboard-tab-geral .stat-card').forEach(el => el.innerHTML = '<div class="empty-state" style="padding:0;">Carregando...</div>');
             document.getElementById('team-load-panel').innerHTML = '<div class="empty-state" style="grid-column: 1/-1;">Carregando equipe...</div>';
             topSectorsList.innerHTML = '';
             
-            // -------------------------------------------------------------
-            // 2. BUSCA DO JSON COMPLETO NO SUPABASE
-            // -------------------------------------------------------------
+            // 1. BUSCA DO JSON NO BANCO
             const { data: kpiData, error } = await supabaseClient.rpc('get_maintenance_dashboard_kpis', {
                 start_date: startDateStr,
                 end_date: endDateStr,
@@ -12707,117 +12702,44 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
                 return;
             }
 
-            // -------------------------------------------------------------
-            // 3. INJEÇÃO DOS DADOS NOS CARDS RICOS (ABA GERAL)
-            // -------------------------------------------------------------
-            
-            // OS CRIADAS
+            // 2. INJEÇÃO ABA GERAL (CARDS)
             const mediaDia = (kpiData.criadas.atual / diasPeriodo).toFixed(1);
-            document.getElementById('kpi-criadas').innerHTML = buildRichCardHtml(
-                'OS Criadas no Período', 
-                kpiData.criadas.atual, 
-                getTrendHtml(kpiData.criadas.atual, kpiData.criadas.anterior, true), // reverseColors=true (Aumento de OS é "ruim/vermelho")
-                `↳ Média de ${mediaDia} por dia`
-            );
+            document.getElementById('kpi-criadas').innerHTML = buildRichCardHtml('OS Criadas no Período', kpiData.criadas.atual, getTrendHtml(kpiData.criadas.atual, kpiData.criadas.anterior, true), `↳ Média de ${mediaDia} por dia`);
 
-            // PENDENTES AGORA
-            let contextoPendentes = kpiData.pendentes.velhas > 0 
-                ? `<span style="color:var(--color-warning);">⚠️ ${kpiData.pendentes.velhas} OSs paradas há > 5 dias</span>` 
-                : `↳ Fila sob controle (Max: ${kpiData.pendentes.max_dias} dias)`;
-            
-            document.getElementById('kpi-pendentes').innerHTML = buildRichCardHtml(
-                'Pendentes Agora (Backlog)', 
-                kpiData.pendentes.atual, 
-                null, // Não tem tendência para backlog atual vs passado fixo
-                contextoPendentes
-            );
+            let contextoPendentes = kpiData.pendentes.velhas > 0 ? `<span style="color:var(--color-warning);">⚠️ ${kpiData.pendentes.velhas} OSs paradas há > 5 dias</span>` : `↳ Fila sob controle (Max: ${kpiData.pendentes.max_dias} dias)`;
+            document.getElementById('kpi-pendentes').innerHTML = buildRichCardHtml('Pendentes Agora (Backlog)', kpiData.pendentes.atual, null, contextoPendentes);
 
-            // RESOLVIDAS
             const taxaVazao = kpiData.criadas.atual > 0 ? Math.round((kpiData.resolvidas.atual / kpiData.criadas.atual) * 100) : 100;
-            document.getElementById('kpi-resolvidas').innerHTML = buildRichCardHtml(
-                'Resolvidas no Período', 
-                kpiData.resolvidas.atual, 
-                getTrendHtml(kpiData.resolvidas.atual, kpiData.resolvidas.anterior, false), // Aumento de resolvidas é "bom/verde"
-                `↳ Taxa de Resolução: <strong style="color:${taxaVazao < 100 ? 'var(--color-danger)' : 'var(--color-success)'}">${taxaVazao}%</strong>`
-            );
+            document.getElementById('kpi-resolvidas').innerHTML = buildRichCardHtml('Resolvidas no Período', kpiData.resolvidas.atual, getTrendHtml(kpiData.resolvidas.atual, kpiData.resolvidas.anterior, false), `↳ Taxa de Resolução: <strong style="color:${taxaVazao < 100 ? 'var(--color-danger)' : 'var(--color-success)'}">${taxaVazao}%</strong>`);
 
-            // MÁQUINAS PARADAS
-            document.getElementById('kpi-paradas').innerHTML = buildRichCardHtml(
-                'Máquinas Paradas', 
-                kpiData.paradas.atual, 
-                null, 
-                kpiData.paradas.atual > 0 ? `⚠️ Parada mais longa: ${kpiData.paradas.max_horas}h` : `<span style="color:var(--color-success);">Tudo operando</span>`
-            );
+            document.getElementById('kpi-paradas').innerHTML = buildRichCardHtml('Máquinas Paradas', kpiData.paradas.atual, null, kpiData.paradas.atual > 0 ? `⚠️ Parada mais longa: ${kpiData.paradas.max_horas}h` : `<span style="color:var(--color-success);">Tudo operando</span>`);
 
-            // TEMPO PARA PLANEJAR E TEMPO DE REPARO
             const mttpTrend = kpiData.mttp.anterior !== 'N/A' ? `Anteriormente: ${kpiData.mttp.anterior}` : '';
             document.getElementById('kpi-mttp').innerHTML = buildRichCardHtml('Tempo Médio p/ Planejar', kpiData.mttp.atual, null, mttpTrend ? `↳ ${mttpTrend}` : '');
 
             const mttrTrend = kpiData.mttr.anterior !== 'N/A' ? `Anteriormente: ${kpiData.mttr.anterior}` : '';
             document.getElementById('kpi-mttr').innerHTML = buildRichCardHtml('Tempo Médio de Reparo', kpiData.mttr.atual, null, mttrTrend ? `↳ ${mttrTrend}` : '');
 
-            // SATISFAÇÃO (CSAT)
-            document.getElementById('kpi-csat').innerHTML = buildRichCardHtml(
-                'Satisfação Geral', 
-                `${kpiData.csat.media} <span style="font-size:1.6rem; color:var(--color-warning); position:relative; top:2px;">★</span>`, 
-                null, 
-                `↳ Baseado em ${kpiData.csat.qtd} avaliações`
-            );
+            document.getElementById('kpi-csat').innerHTML = buildRichCardHtml('Satisfação Geral', `${kpiData.csat.media} <span style="font-size:1.6rem; color:var(--color-warning); position:relative; top:2px;">★</span>`, null, `↳ Baseado em ${kpiData.csat.qtd} avaliações`);
 
-            // ---> LIGA A ANIMAÇÃO E REVELA OS CARDS <---
             document.querySelectorAll('.stat-card').forEach((card, i) => setTimeout(() => card.classList.add('visible'), i * 50));
 
-            // -------------------------------------------------------------
-            // 4. TOP SETORES & GRÁFICO DE BARRAS
-            // -------------------------------------------------------------
+            // 3. TOP SETORES & GRÁFICO
             if(kpiData.top_sectors && kpiData.top_sectors.length > 0) {
-                topSectorsList.innerHTML = kpiData.top_sectors.map(item => `
-                    <div onclick="applySectorFilter('${item.setor}')" style="display:flex; justify-content:space-between; padding:0.8rem; border-radius:8px; cursor:pointer; transition:all 0.2s; ${currentDashboardFilters.setor === item.setor ? 'background-color: var(--color-brand-primary); color: white; transform:scale(1.02);' : 'background-color: var(--color-background); margin-bottom:0.5rem;'}">
-                        <span style="font-weight: 600; text-transform: capitalize;">${item.setor}</span>
-                        <span style="font-weight: 800;">${item.total}</span>
-                    </div>`).join('');
-            } else {
-                topSectorsList.innerHTML = `<div class="empty-state">Sem dados no período.</div>`;
-            }
+                topSectorsList.innerHTML = kpiData.top_sectors.map(item => `<div onclick="applySectorFilter('${item.setor}')" style="display:flex; justify-content:space-between; padding:0.8rem; border-radius:8px; cursor:pointer; transition:all 0.2s; ${currentDashboardFilters.setor === item.setor ? 'background-color: var(--color-brand-primary); color: white; transform:scale(1.02);' : 'background-color: var(--color-background); margin-bottom:0.5rem;'}"><span style="font-weight: 600; text-transform: capitalize;">${item.setor}</span><span style="font-weight: 800;">${item.total}</span></div>`).join('');
+            } else { topSectorsList.innerHTML = `<div class="empty-state">Sem dados no período.</div>`; }
 
             if (chartCanvas && kpiData.daily_volume) {
                 const ctx = chartCanvas.getContext('2d');
                 if (window.osVolumeChart) { window.osVolumeChart.destroy(); }
-                
                 const labels = [...new Set(kpiData.daily_volume.map(d => new Date(d.dia + 'T12:00:00').toLocaleDateString('pt-BR')))].sort((a,b) => new Date(a.split('/').reverse().join('-')) - new Date(b.split('/').reverse().join('-')));
-                
-                const datasets = {
-                    'Criadas (Abertas no Dia)': { backgroundColor: 'rgba(59, 130, 246, 0.7)', data: [], borderRadius: 4 },
-                    'Executadas (Saída)': { backgroundColor: 'rgba(16, 185, 129, 0.7)', data: [], borderRadius: 4 }
-                };
-
-                const volumeByDate = kpiData.daily_volume.reduce((acc, curr) => {
-                    const date = new Date(curr.dia + 'T12:00:00').toLocaleDateString('pt-BR');
-                    if (!acc[date]) acc[date] = {};
-                    acc[date][curr.status] = curr.total;
-                    return acc;
-                }, {});
-
-                labels.forEach(label => {
-                    const dayData = volumeByDate[label] || {};
-                    datasets['Criadas (Abertas no Dia)'].data.push(dayData.pending || dayData.pending_manager_check || 0); 
-                    datasets['Executadas (Saída)'].data.push(dayData.executed || 0);
-                });
-
-                window.osVolumeChart = new Chart(ctx, {
-                    type: 'bar',
-                    data: { labels: labels, datasets: Object.keys(datasets).map(key => ({ label: key, ...datasets[key] })) },
-                    options: {
-                        responsive: true, maintainAspectRatio: false,
-                        scales: { x: { grid: { display: false } }, y: { beginAtZero: true, border: { dash: [4, 4] } } },
-                        plugins: { legend: { position: 'top' } }
-                    }
-                });
+                const datasets = { 'Criadas (Abertas no Dia)': { backgroundColor: 'rgba(59, 130, 246, 0.7)', data: [], borderRadius: 4 }, 'Executadas (Saída)': { backgroundColor: 'rgba(16, 185, 129, 0.7)', data: [], borderRadius: 4 } };
+                const volumeByDate = kpiData.daily_volume.reduce((acc, curr) => { const date = new Date(curr.dia + 'T12:00:00').toLocaleDateString('pt-BR'); if (!acc[date]) acc[date] = {}; acc[date][curr.status] = curr.total; return acc; }, {});
+                labels.forEach(label => { const dayData = volumeByDate[label] || {}; datasets['Criadas (Abertas no Dia)'].data.push(dayData.pending || dayData.pending_manager_check || 0); datasets['Executadas (Saída)'].data.push(dayData.executed || 0); });
+                window.osVolumeChart = new Chart(ctx, { type: 'bar', data: { labels: labels, datasets: Object.keys(datasets).map(key => ({ label: key, ...datasets[key] })) }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, border: { dash: [4, 4] } } }, plugins: { legend: { position: 'top' } } } });
             }
 
-            // -------------------------------------------------------------
-            // 5. ABA: ANÁLISE DA EQUIPE (Carga Atual e Histórica)
-            // -------------------------------------------------------------
+            // 4. ABA DA EQUIPE
             const { data: techs } = await supabaseClient.from('maintenance_technicians').select('id, name, specialty').eq('is_active', true).order('name');
             const teamReqs = allMaintenanceRequestsCache || [];
 
@@ -12827,78 +12749,23 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
                 let loadHtml = ''; let tableHtml = '';
 
                 techs.forEach(tech => {
-                    // Filtra OSs do técnico atual
-                    const myReqs = teamReqs.filter(r => {
-                        const assignedStr = (r.data && r.data.tecnicos_planejados) ? r.data.tecnicos_planejados : "";
-                        return assignedStr.includes(tech.name);
-                    });
-
+                    const myReqs = teamReqs.filter(r => { const assignedStr = (r.data && r.data.tecnicos_planejados) ? r.data.tecnicos_planejados : ""; return assignedStr.includes(tech.name); });
                     const planned = myReqs.filter(r => r.status === 'planned');
                     const executedInPeriod = myReqs.filter(r => r.status === 'executed');
 
-                    // Painel de Carga Otimizado Visualmente
                     const isBusy = planned.length > 0;
                     const currentOS = isBusy ? (planned[0].data?.equipamento || 'OS sem descrição') : 'Aguardando novas atribuições';
-                    
-                    // Indicadores visuais dinâmicos
                     const pulseDot = isBusy ? `<span style="display:inline-block; width:8px; height:8px; background:var(--color-warning); border-radius:50%; margin-right:5px; animation: pulse-warning 2s infinite;"></span>` : `<span class="material-icons" style="font-size:14px; margin-right:4px; vertical-align:middle;">check_circle</span>`;
                     const statusColor = isBusy ? 'var(--color-warning)' : 'var(--color-success)';
                     const statusLabel = isBusy ? 'EM ATENDIMENTO' : 'DISPONÍVEL';
-                    
-                    // Gramática da Fila
                     let filaTexto = `<span style="color:var(--color-text-secondary); font-size:1.2rem;">Nenhuma</span>`;
                     if (planned.length === 1) filaTexto = `<strong style="font-size:1.5rem; color:var(--color-text-primary);">1</strong> <span style="font-size:0.9rem;">OS</span>`;
                     if (planned.length > 1) filaTexto = `<strong style="font-size:1.5rem; color:${planned.length > 3 ? 'var(--color-danger)' : 'var(--color-text-primary)'};">${planned.length}</strong> <span style="font-size:0.9rem;">OSs</span>`;
 
-                    loadHtml += `
-                        <div class="technician-load-card" style="${isBusy ? 'border-top: 4px solid var(--color-warning);' : 'border-top: 4px solid var(--color-surface);'}">
-                            <div class="technician-header" style="border-bottom:none; padding-bottom:0;">
-                                <div class="technician-avatar">${tech.name.charAt(0)}</div>
-                                <div>
-                                    <div class="technician-name">${tech.name}</div>
-                                    <div style="font-size: 0.75rem; color: var(--color-text-secondary);">${tech.specialty || 'Técnico de Manutenção'}</div>
-                                </div>
-                            </div>
-                            
-                            <div style="margin-top: 10px; padding: 12px; background: var(--color-background); border-radius: 8px;">
-                                <div style="font-size: 0.7rem; font-weight: 800; color: ${statusColor}; letter-spacing: 0.05em; margin-bottom: 4px; display:flex; align-items:center;">
-                                    ${pulseDot} ${statusLabel}
-                                </div>
-                                <div style="font-size: 0.9rem; font-weight: 500; color: var(--color-text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                    ${currentOS}
-                                </div>
-                            </div>
+                    loadHtml += `<div class="technician-load-card" style="${isBusy ? 'border-top: 4px solid var(--color-warning);' : 'border-top: 4px solid var(--color-surface);'}"><div class="technician-header" style="border-bottom:none; padding-bottom:0;"><div class="technician-avatar">${tech.name.charAt(0)}</div><div><div class="technician-name">${tech.name}</div><div style="font-size: 0.75rem; color: var(--color-text-secondary);">${tech.specialty || 'Técnico de Manutenção'}</div></div></div><div style="margin-top: 10px; padding: 12px; background: var(--color-background); border-radius: 8px;"><div style="font-size: 0.7rem; font-weight: 800; color: ${statusColor}; letter-spacing: 0.05em; margin-bottom: 4px; display:flex; align-items:center;">${pulseDot} ${statusLabel}</div><div style="font-size: 0.9rem; font-weight: 500; color: var(--color-text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${currentOS}</div></div><div style="display:flex; justify-content:space-between; align-items:center; margin-top: auto; padding-top: 10px;"><div style="font-size: 0.75rem; text-transform: uppercase; color: var(--color-text-secondary); font-weight: 700;">Fila de Espera</div><div>${filaTexto}</div></div></div>`;
 
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-top: auto; padding-top: 10px;">
-                                <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--color-text-secondary); font-weight: 700;">Fila de Espera</div>
-                                <div>${filaTexto}</div>
-                            </div>
-                        </div>`;
+                    tableHtml += `<tr><td><div style="display:flex; align-items:center; gap:10px;"><div class="technician-avatar" style="width:28px; height:28px; font-size:0.8rem;">${tech.name.charAt(0)}</div><strong>${tech.name}</strong></div></td><td>${executedInPeriod.length > 0 ? `<span style="background:var(--color-success-bg); color:var(--color-success); padding:4px 12px; border-radius:20px; font-weight:800;">${executedInPeriod.length}</span>` : `<span style="color:var(--color-text-secondary);">-</span>`}</td><td id="mttr-tech-${tech.id}"><span class="material-icons refresh-spin" style="font-size:14px;">sync</span></td><td>${planned.length > 0 ? `<span style="background:${planned.length > 3 ? 'var(--color-danger-bg)' : 'var(--color-warning-bg)'}; color:${planned.length > 3 ? 'var(--color-danger)' : 'var(--color-warning)'}; padding:4px 12px; border-radius:20px; font-weight:800;">${planned.length} OS${planned.length > 1 ? 's' : ''}</span>` : `<span style="color:var(--color-text-secondary);">-</span>`}</td></tr>`;
 
-                    // LÓGICA DA TABELA DE PERFORMANCE E CORREÇÃO DO N/A
-                    tableHtml += `
-                        <tr>
-                            <td>
-                                <div style="display:flex; align-items:center; gap:10px;">
-                                    <div class="technician-avatar" style="width:28px; height:28px; font-size:0.8rem;">${tech.name.charAt(0)}</div>
-                                    <strong>${tech.name}</strong>
-                                </div>
-                            </td>
-                            <td>
-                                ${executedInPeriod.length > 0 
-                                    ? `<span style="background:var(--color-success-bg); color:var(--color-success); padding:4px 12px; border-radius:20px; font-weight:800;">${executedInPeriod.length}</span>` 
-                                    : `<span style="color:var(--color-text-secondary);">-</span>`}
-                            </td>
-                            <td id="mttr-tech-${tech.id}"><span class="material-icons refresh-spin" style="font-size:14px;">sync</span></td>
-                            <td>
-                                ${planned.length > 0
-                                    ? `<span style="background:${planned.length > 3 ? 'var(--color-danger-bg)' : 'var(--color-warning-bg)'}; color:${planned.length > 3 ? 'var(--color-danger)' : 'var(--color-warning)'}; padding:4px 12px; border-radius:20px; font-weight:800;">${planned.length} OS${planned.length > 1 ? 's' : ''}</span>`
-                                    : `<span style="color:var(--color-text-secondary);">-</span>`}
-                            </td>
-                        </tr>
-                    `;
-
-                    // Busca assíncrona do tempo de reparo (MTTR) para não travar a tela
                     if (executedInPeriod.length > 0) {
                         const osIds = executedInPeriod.map(r => r.id);
                         supabaseClient.from('request_history').select('request_id, status, created_at').in('request_id', osIds)
@@ -12907,18 +12774,20 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
                             osIds.forEach(osId => {
                                 const p = hist.find(h => h.request_id === osId && h.status === 'planned');
                                 const e = hist.find(h => h.request_id === osId && h.status === 'executed');
-                                if(p && e) {
-                                    totalMs += (new Date(e.created_at) - new Date(p.created_at));
-                                    valid++;
-                                }
+                                if(p && e) { totalMs += (new Date(e.created_at) - new Date(p.created_at)); valid++; }
                             });
                             const avgStr = valid > 0 ? `${Math.floor((totalMs/valid)/3600000)}h ${Math.floor(((totalMs/valid)%3600000)/60000)}m` : 'N/A';
-                            document.getElementById(`mttr-tech-${tech.id}`).innerHTML = `<strong style="color:var(--color-text-primary);">${avgStr}</strong>`;
+                            const el = document.getElementById(`mttr-tech-${tech.id}`); if(el) el.innerHTML = `<strong style="color:var(--color-text-primary);">${avgStr}</strong>`;
                         });
                     } else {
-                        setTimeout(() => document.getElementById(`mttr-tech-${tech.id}`).innerHTML = `<span style="color:var(--color-text-secondary);">-</span>`, 100);
+                        setTimeout(() => { const el = document.getElementById(`mttr-tech-${tech.id}`); if(el) el.innerHTML = `<span style="color:var(--color-text-secondary);">-</span>`; }, 100);
                     }
                 });
+
+                teamLoadPanel.innerHTML = loadHtml;
+                teamPerfTable.innerHTML = tableHtml || `<tr><td colspan="4" class="empty-state">Sem dados processados.</td></tr>`;
+            }
+        }
 
     </script>
 		
