@@ -6095,13 +6095,10 @@ async function openRequestDetailsModal(requestId) {
                 
                 const [checkRes, settingsRes, historyRes] = await Promise.all([
                     supabaseClient.from('request_manager_checks').select('*, manager:manager_id(full_name)').eq('request_id', requestId).single(),
-            supabaseClient.from('request_manager_checks').select('*, manager:manager_id(full_name)').eq('request_id', requestId).single(),
-            supabaseClient.from('request_type_settings').select('*'),
-            supabaseClient.from('request_history').select('*').eq('request_id', requestId).order('created_at', { ascending: true })
-        ]);
-
-        if (reqRes.error) throw reqRes.error;
-        const request = reqRes.data;
+                    supabaseClient.from('request_type_settings').select('*'),
+                    supabaseClient.from('request_history').select('*').eq('request_id', requestId).order('created_at', { ascending: true })
+                ]);
+        
         const managerCheck = checkRes.data;
         requestTypeSettingsCache = settingsRes.data || [];
         const requestHistory = historyRes.data || [];
