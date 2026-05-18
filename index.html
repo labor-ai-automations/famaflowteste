@@ -2973,8 +2973,16 @@ const appHTML = `<div id="app-container">
                     <div id="maintenance-tab-dashboard" class="maintenance-tab-content maintenance-dashboard">
     
                         <!-- SEÇÃO 1: BARRA DE FILTROS (ESTILO SAAS COM FLATPICKR) -->
-                        <div class="dashboard-filter-bar">
-                            <h3 class="filter-bar-title">Análise de Manutenção</h3>
+                        <div class="dashboard-filter-bar" style="justify-content: space-between;">
+                            <div style="display:flex; align-items:center; gap: 1.5rem;">
+                                <h3 class="filter-bar-title">Análise de Manutenção</h3>
+                                
+                                <!-- Toggle de Visão para Líderes -->
+                                <div id="dashboard-view-toggle" style="display:none; background: var(--color-background); padding: 4px; border-radius: 8px; border: 1px solid var(--color-border);">
+                                    <button class="btn btn-secondary active" id="btn-view-global" onclick="switchDashboardView('global')" style="border: none; padding: 0.4rem 0.8rem;">🏭 Fábrica</button>
+                                    <button class="btn btn-secondary" id="btn-view-team" onclick="switchDashboardView('team')" style="border: none; padding: 0.4rem 0.8rem;">👥 Minha Equipe</button>
+                                </div>
+                            </div>
                             <div class="filter-controls">
                                 <style>
                                     /* Garante que o input visual do calendário respeite o espaçamento e largura */
@@ -6065,19 +6073,28 @@ async function submitOvertimeCalculation(requestId) {
 }
 
 async function openRequestDetailsModal(requestId) {
-    const modal = document.getElementById('request-modal');
-    const modalTitle = document.getElementById('request-modal-title');
-    const modalBody = document.getElementById('request-modal-body');
-    const modalFooter = document.getElementById('request-modal-footer');
+            const modal = document.getElementById('request-modal');
+            const modalTitle = document.getElementById('request-modal-title');
+            const modalBody = document.getElementById('request-modal-body');
+            const modalFooter = document.getElementById('request-modal-footer');
 
-    modalTitle.textContent = 'Acompanhamento da Requisição';
-    modalBody.innerHTML = '<div class="empty-state">Carregando detalhes...</div>';
-    modalFooter.innerHTML = '';
-    modal.classList.add('visible');
+            modalTitle.textContent = 'Acompanhamento da Requisição';
+            modalBody.innerHTML = '<div class="empty-state">Carregando detalhes...</div>';
+            modalFooter.innerHTML = '';
+            modal.classList.add('visible');
 
-    try {
-        const [reqRes, checkRes, settingsRes, historyRes] = await Promise.all([
-            supabaseClient.from('requests').select('*, requester:profiles!requests_requester_id_fkey(full_name, manager_id)').eq('id', requestId).single(),
+            try {
+                // CORREÇÃO: Força o resultado único com .single() para evitar o erro JSON
+                const { data: request, error: reqError } = await supabaseClient
+                    .from('requests')
+                    .select('*, requester:profiles!requests_requester_id_fkey(full_name, manager_id)')
+                    .eq('id', requestId)
+                    .single();
+
+                if (reqError) throw reqError;
+                
+                const [checkRes, settingsRes, historyRes] = await Promise.all([
+                    supabaseClient.from('request_manager_checks').select('*, manager:manager_id(full_name)').eq('request_id', requestId).single(),
             supabaseClient.from('request_manager_checks').select('*, manager:manager_id(full_name)').eq('request_id', requestId).single(),
             supabaseClient.from('request_type_settings').select('*'),
             supabaseClient.from('request_history').select('*').eq('request_id', requestId).order('created_at', { ascending: true })
@@ -12666,6 +12683,13 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
             loadMaintenanceDashboard();
         }
 
+        function switchDashboardView(view) {
+            currentDashboardFilters.view = view;
+            document.getElementById('btn-view-global').classList.toggle('active', view === 'global');
+            document.getElementById('btn-view-team').classList.toggle('active', view === 'team');
+            loadMaintenanceDashboard(); // Recarrega os dados com a nova visão
+        }
+
         function switchDashboardTab(tabId) {
             document.getElementById('dashboard-tab-geral').style.display = tabId === 'geral' ? 'block' : 'none';
             document.getElementById('dashboard-tab-equipe').style.display = tabId === 'equipe' ? 'block' : 'none';
@@ -12750,11 +12774,41 @@ async function generateSingleFeedbackPDF(feedbackId = null) {
             topSectorsList.innerHTML = '';
             
             // 1. BUSCA DO JSON NO BANCO
-            const { data: kpiData, error } = await supabaseClient.rpc('get_maintenance_dashboard_kpis', {
-                start_date: startDateStr,
-                end_date: endDateStr,
-                p_setor: currentDashboardFilters.setor
-            }).single();
+            // 2. BUSCA DO JSON COMPLETO NO SUPABASE
+            // -------------------------------------------------------------
+            
+            // Lógica de Permissão para Visão do Dashboard
+            const p = currentUserProfile.permissions || [];
+            const isMaintenanceManager = p.includes('mgt_maintenance') || p.includes('manage_users');
+            const canViewTeamData = p.includes('view_team_maintenance');
+
+            // Esconde/Mostra a aba "Análise da Equipe"
+            document.getElementById('tab-btn-equipe').style.display = isMaintenanceManager ? 'block' : 'none';
+
+            let kpiData, error;
+
+            if (canViewTeamData && currentDashboardFilters.view === 'team') {
+                // O gestor (Tainan) está na visão de equipe
+                const { data: hierarchy } = await supabaseClient.rpc('get_user_hierarchy', { p_manager_id: currentUserProfile.id });
+                const teamIds = hierarchy.map(u => u.user_id);
+
+                const { data, error: rpcError } = await supabaseClient.rpc('get_maintenance_dashboard_kpis_for_team', {
+                    start_date: startDateStr,
+                    end_date: endDateStr,
+                    p_user_ids: teamIds
+                }).single();
+                kpiData = data;
+                error = rpcError;
+            } else {
+                // Visão padrão da fábrica inteira
+                const { data, error: rpcError } = await supabaseClient.rpc('get_maintenance_dashboard_kpis', {
+                    start_date: startDateStr,
+                    end_date: endDateStr,
+                    p_setor: null // Para a visão global, não filtramos por setor
+                }).single();
+                kpiData = data;
+                error = rpcError;
+            }
 
             if (error || !kpiData) {
                 console.error("Erro ao carregar KPIs:", error);
