@@ -2427,6 +2427,7 @@ const PERMISSION_MAPPING = {
     'view_dashboard': 'Dashboard',
     'view_messages': 'Mensagens (Envio e Visualização)',
     'view_maintenance': 'Módulo de Manutenção',
+    'view_team_maintenance': 'Acompanhar Chamados da Equipe (Liderança)',
     'view_requests': 'Requisições Gerais (RH/Outros)',
     'view_routines': 'Minhas Rotinas (Calendário)',
     'view_team': 'Equipe',
@@ -2911,9 +2912,22 @@ const appHTML = `<div id="app-container">
 
                     <!-- Conteúdo das Abas -->
                     <div id="maintenance-tab-my_requests" class="maintenance-tab-content" style="display:none;">
+                        
+                        <!-- NOVO: Toggle de visão da equipe (ficará invisível para quem não for líder) -->
+                        <div id="team-maintenance-toggle-container" style="display: none; margin-bottom: 1rem; background: var(--color-surface); padding: 0.5rem; border-radius: 8px; border: 1px solid var(--color-border); align-items: center; gap: 0.5rem; width: max-content;">
+                            <button class="btn btn-secondary active" id="btn-view-my-maint" onclick="loadMaintenanceRequestsView('me')" style="border: none; padding: 0.5rem 1rem;">
+                                <span class="material-icons" style="font-size: 18px; margin-right: 5px;">person</span> Meus Chamados
+                            </button>
+                            <button class="btn btn-secondary" id="btn-view-team-maint" onclick="loadMaintenanceRequestsView('team')" style="border: none; padding: 0.5rem 1rem;">
+                                <span class="material-icons" style="font-size: 18px; margin-right: 5px;">group</span> Chamados da Equipe
+                            </button>
+                        </div>
+
                         <div class="card" style="padding:0;">
                             <table class="data-table">
-                                <thead><tr><th>Tipo</th><th>Equipamento/Infra</th><th>Data</th><th>Status</th><th>Ações</th></tr></thead>
+                                <thead id="my-maintenance-table-head">
+                                    <tr><th>Tipo</th><th>Equipamento/Infra</th><th>Data</th><th>Status</th><th>Ações</th></tr>
+                                </thead>
                                 <tbody id="my-maintenance-table-body"></tbody>
                             </table>
                         </div>
@@ -3261,6 +3275,10 @@ const appHTML = `<div id="app-container">
                                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.625rem;">
                                         <label class="perm-checkbox"><input type="checkbox" id="perm-view_maintenance"><span class="perm-checkmark"></span><span class="material-icons perm-icon">visibility</span><span class="perm-text">Visualizar Módulo</span></label>
                                         <label class="perm-checkbox"><input type="checkbox" id="perm-req_maintenance"><span class="perm-checkmark"></span><span class="material-icons perm-icon">add_circle</span><span class="perm-text">Abrir Solicitações</span></label>
+                                        
+                                        <!-- NOVA PERMISSÃO AQUI -->
+                                        <label class="perm-checkbox" style="grid-column: 1 / -1;"><input type="checkbox" id="perm-view_team_maintenance"><span class="perm-checkmark"></span><span class="material-icons perm-icon" style="color:var(--color-info);">group</span><span class="perm-text" style="color:var(--color-info);">Acompanhar Chamados da Equipe (Visão Liderança)</span></label>
+                                        
                                         <label class="perm-checkbox"><input type="checkbox" id="perm-mgt_maintenance"><span class="perm-checkmark"></span><span class="material-icons perm-icon">rule_folder</span><span class="perm-text">Gerenciar (Planejar)</span></label>
                                         <label class="perm-checkbox"><input type="checkbox" id="perm-manage_technicians"><span class="perm-checkmark"></span><span class="material-icons perm-icon">engineering</span><span class="perm-text">Gerenciar Técnicos</span></label>
                                         <label class="perm-checkbox" style="grid-column: 1 / -1;"><input type="checkbox" id="perm-manage_preventive_schedules"><span class="perm-checkmark"></span><span class="material-icons perm-icon">event_note</span><span class="perm-text">Gerenciar Calendário Preventivo</span></label>
@@ -9011,6 +9029,47 @@ async function saveTechnician() {
         const maintenanceItemsPerPage = 10;
         let currentMaintenanceStatusFilter = 'all';
 
+        // NOVA FUNÇÃO: Alterna a visão entre 'Meus Chamados' e 'Chamados da Equipe'
+        async function loadMaintenanceRequestsView(viewType) {
+            const tbody = document.getElementById('my-maintenance-table-body');
+            const thead = document.getElementById('my-maintenance-table-head');
+            
+            // Atualiza botões
+            document.getElementById('btn-view-my-maint').classList.toggle('active', viewType === 'me');
+            document.getElementById('btn-view-my-maint').classList.toggle('btn-info', viewType === 'me');
+            document.getElementById('btn-view-team-maint').classList.toggle('active', viewType === 'team');
+            document.getElementById('btn-view-team-maint').classList.toggle('btn-info', viewType === 'team');
+
+            if (viewType === 'team') {
+                thead.innerHTML = `<tr><th>Solicitante</th><th>Equipamento/Infra</th><th>Data</th><th>Status</th><th>Ações</th></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Buscando chamados da sua equipe...</td></tr>`;
+                
+                const { data, error } = await supabaseClient.rpc('get_team_maintenance_requests', {
+                    p_manager_id: currentUserProfile.id
+                });
+                
+                if (error) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="empty-state" style="color:var(--color-danger);">Erro ao consultar dados da equipe.</td></tr>`;
+                } else if (!data || data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Nenhum chamado aberto pela sua equipe no momento.</td></tr>`;
+                } else {
+                    renderMaintenanceTable('my-maintenance-table-body', data, true); // true = exibe o nome do solicitante
+                }
+            } else {
+                thead.innerHTML = `<tr><th>Tipo</th><th>Equipamento/Infra</th><th>Data</th><th>Status</th><th>Ações</th></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Carregando seus chamados...</td></tr>`;
+                
+                const { data, error } = await supabaseClient.rpc('get_my_requests');
+                
+                if (error) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Erro ao carregar solicitações.</td></tr>`;
+                } else {
+                    const myMaintenanceReqs = (data || []).filter(r => r.type === 'maintenance');
+                    renderMaintenanceTable('my-maintenance-table-body', myMaintenanceReqs, false);
+                }
+            }
+        }
+
         async function loadMaintenancePage() {
             const p = currentUserProfile.permissions || [];
             const isAdmin = p.includes('manage_users');
@@ -9023,16 +9082,15 @@ async function saveTechnician() {
             document.getElementById('tab-btn-technicians').style.display = (isAdmin || p.includes('manage_technicians')) ? 'block' : 'none';
             document.getElementById('tab-btn-preventive').style.display = (isAdmin || p.includes('manage_preventive_schedules')) ? 'block' : 'none';
 
-            // --- Carrega dados da aba "Minhas Solicitações" (sem alterações) ---
-            const myRequestsBody = document.getElementById('my-maintenance-table-body');
-            myRequestsBody.innerHTML = `<tr><td colspan="5" class="empty-state">Carregando...</td></tr>`;
-            const { data: myReqs, error: myReqsError } = await supabaseClient.rpc('get_my_requests');
-            if (myReqsError) {
-                myRequestsBody.innerHTML = `<tr><td colspan="5" class="empty-state">Erro ao carregar solicitações.</td></tr>`;
+            // --- Carrega dados da aba "Minhas Solicitações" (com lógica de Liderança) ---
+            const toggleContainer = document.getElementById('team-maintenance-toggle-container');
+            if (isAdmin || p.includes('view_team_maintenance')) {
+                toggleContainer.style.display = 'flex';
             } else {
-                const myMaintenanceReqs = (myReqs || []).filter(r => r.type === 'maintenance');
-                renderMaintenanceTable('my-maintenance-table-body', myMaintenanceReqs, false);
+                toggleContainer.style.display = 'none';
             }
+            // Chama a função nova que busca os dados dependendo do botão ativo
+            loadMaintenanceRequestsView('me');
 
             // --- Carrega dados da aba "Gerenciar Pendências" (com otimizações) ---
             if (isAdmin || p.includes('mgt_maintenance')) {
