@@ -9128,6 +9128,47 @@ async function saveTechnician() {
             }
         }
 
+        // NOVA FUNÇÃO: Alterna a visão entre 'Meus Chamados' e 'Chamados da Equipe'
+        async function loadMaintenanceRequestsView(viewType) {
+            const tbody = document.getElementById('my-maintenance-table-body');
+            const thead = document.getElementById('my-maintenance-table-head');
+            
+            // Atualiza botões
+            document.getElementById('btn-view-my-maint').classList.toggle('active', viewType === 'me');
+            document.getElementById('btn-view-my-maint').classList.toggle('btn-info', viewType === 'me');
+            document.getElementById('btn-view-team-maint').classList.toggle('active', viewType === 'team');
+            document.getElementById('btn-view-team-maint').classList.toggle('btn-info', viewType === 'team');
+
+            if (viewType === 'team') {
+                thead.innerHTML = `<tr><th>Solicitante</th><th>Equipamento/Infra</th><th>Data</th><th>Status</th><th>Ações</th></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Buscando chamados da sua equipe...</td></tr>`;
+                
+                const { data, error } = await supabaseClient.rpc('get_team_maintenance_requests', {
+                    p_manager_id: currentUserProfile.id
+                });
+                
+                if (error) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="empty-state" style="color:var(--color-danger);">Erro ao consultar dados da equipe.</td></tr>`;
+                } else if (!data || data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Nenhum chamado aberto pela sua equipe no momento.</td></tr>`;
+                } else {
+                    renderMaintenanceTable('my-maintenance-table-body', data, true); // true = exibe o nome do solicitante
+                }
+            } else {
+                thead.innerHTML = `<tr><th>Tipo</th><th>Equipamento/Infra</th><th>Data</th><th>Status</th><th>Ações</th></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Carregando seus chamados...</td></tr>`;
+                
+                const { data, error } = await supabaseClient.rpc('get_my_requests');
+                
+                if (error) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Erro ao carregar solicitações.</td></tr>`;
+                } else {
+                    const myMaintenanceReqs = (data || []).filter(r => r.type === 'maintenance');
+                    renderMaintenanceTable('my-maintenance-table-body', myMaintenanceReqs, false);
+                }
+            }
+        }
+
         async function loadMaintenancePage() {
             const p = currentUserProfile.permissions || [];
             const isAdmin = p.includes('manage_users');
